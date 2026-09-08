@@ -28,7 +28,15 @@ const {
 } = Astro.props;
 
 const site = Astro.site ?? new URL('https://pbnb.store');
-const canonical = new URL(Astro.url.pathname, site).href.replace(/\/$/, '') || site.href;
+// With `build.format: 'file'` a prerendered route's pathname is `/about.html`.
+// The canonical (and the sitemap) must be the extensionless URL that is
+// actually served, so strip the extension and any trailing slash.
+const cleanPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/index$/, '') || '/';
+// Root keeps its slash (matching the sitemap); every other path drops it.
+const canonical =
+  cleanPath === '/'
+    ? new URL('/', site).href
+    : new URL(cleanPath, site).href.replace(/\/$/, '');
 // og:image must be absolute and https — the old password page served it over http.
 const ogImage = new URL(image, site).href;
 

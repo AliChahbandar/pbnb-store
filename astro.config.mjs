@@ -15,6 +15,12 @@ export default defineConfig({
   // and its generated session-driver module single-quotes the project path,
   // which breaks outright on a directory containing an apostrophe.
   session: false,
+  // Prerendered routes default to `about/index.html`, which makes /about a 307
+  // to /about/ — a redirect hop on every content-page click, and inconsistent
+  // with the non-slash canonicals we emit. Emit flat files and never add the
+  // trailing slash.
+  trailingSlash: 'never',
+  build: { format: 'file' },
   integrations: [sitemap({ filter: (page) => !page.includes('/cart') && !page.includes('/search') })],
   vite: { build: { assetsInlineLimit: 0 } },
 });
