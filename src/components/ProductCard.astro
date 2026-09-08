@@ -1,6 +1,6 @@
 ---
 import type { Product } from '../lib/types';
-import { galleryFor, optionValues, colorSwatch } from '../lib/catalog';
+import { galleryFor, optionValues, colorSwatch, cardImage } from '../lib/catalog';
 import { priceRange } from '../lib/money';
 
 export interface Props {
@@ -29,10 +29,11 @@ const isNew = product.tags.includes('new');
         perColor.map((pc, i) => (
           <img
             class="im"
-            src={pc.image?.url}
+            src={cardImage(pc.image?.url)}
             alt={i === 0 ? (pc.image?.altText ?? product.title) : ''}
-            width={pc.image?.width ?? 1600}
-            height={pc.image?.height ?? 1600}
+            width="800"
+            height="800"
+            sizes="(max-width: 820px) 50vw, (max-width: 1100px) 33vw, 25vw"
             loading={priority && i === 0 ? 'eager' : 'lazy'}
             fetchpriority={priority && i === 0 ? 'high' : 'auto'}
             decoding={priority && i === 0 ? 'sync' : 'async'}
@@ -75,6 +76,9 @@ const isNew = product.tags.includes('new');
   .card {
     display: grid;
     gap: 0.7rem;
+    /* Cards with no swatch row must not stretch their media to fill the grid
+       row, or their titles sit lower than neighbouring cards. */
+    align-content: start;
   }
   .card__link {
     display: grid;

@@ -354,15 +354,21 @@ distinction — which no stock theme handles properly.
 |---|---|
 | `astro check` | 0 errors, 0 warnings, 0 hints |
 | Production build | Passes |
-| Lighthouse mobile — homepage | Perf **100**, A11y **100**, BP **100**, SEO **100** · LCP 1.89 s |
-| Lighthouse mobile — collection | Perf **99**, A11y **100**, BP **100**, SEO **100** · LCP 2.20 s |
+| Lighthouse mobile — homepage | Perf **100**, A11y **100**, BP **100**, SEO **100** · LCP 1.82 s |
+| Lighthouse mobile — collection | Perf **100**, A11y **100**, BP **100**, SEO **100** · LCP 1.52 s |
 | Lighthouse mobile — product | Perf **99**, A11y **100**, BP **100**, SEO **100** · LCP 1.81 s |
 | CLS / TBT | **0** and **0 ms** on all three |
 
 Performance and LCP are the **median of 3 runs** against the production build under
-wrangler. Single runs varied by up to 5 points on the collection page (95–99), so a
-median is the honest figure; accessibility, best-practices and SEO were 100 on every
-run. Measured on localhost, so LCP is optimistic relative to real-world network.
+wrangler. Measured on localhost, so LCP is optimistic relative to real-world network.
+
+The collection page initially measured 96 median with a noisy 2.0–2.9 s LCP. Cause:
+each card renders one image per colourway for the CSS swatch-hover swap, and those
+alternates sit **inside the viewport**, so `loading="lazy"` does not defer them — they
+were downloading at full 1600px and competing with the LCP image. Two fixes: cards now
+use the 800px asset (they never render wider than ~390 CSS px), and only the single
+first card carries `fetchpriority="high"` instead of two. Collection page image weight
+went 408 KB → 196 KB and the score went to a stable 100 with LCP 1.52 s.
 | 375px horizontal overflow | 14/14 pages clean |
 | Keyboard-only variant selection | Passes — Tab reaches swatches and sizes, Enter activates, gallery swaps, URL updates, sold-out correctly refuses |
 | EXIF/GPS in output images | 0 of 38 files carry exif/xmp/iptc |

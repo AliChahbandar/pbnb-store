@@ -7,7 +7,7 @@
  * identical either way, so nothing downstream changes when the token lands.
  */
 
-import { storefront } from './shopify';
+import { storefront, shopifyImage } from './shopify';
 import { GET_PRODUCT, GET_COLLECTION, GET_COLLECTIONS, SEARCH_PRODUCTS } from './queries';
 import { FIXTURE_PRODUCTS, FIXTURE_COLLECTIONS, COLOR_SWATCHES, SIZE_CHARTS } from './fixtures';
 import type { Product, Collection, Variant, FilterFacet, ImageRef, SizeChart } from './types';
@@ -375,3 +375,23 @@ export function getSizeChart(key?: string | null): SizeChart | null {
 }
 
 export const LOW_STOCK_THRESHOLD = 6;
+
+/**
+ * Card-sized variant of an image URL.
+ *
+ * Product cards never render wider than ~390 CSS px, so the 1600px asset is
+ * roughly 4x more pixels than any card can use. On a collection grid that
+ * difference is the whole page weight — the alternate-colourway images sit
+ * inside the viewport, so `loading="lazy"` does not defer them and they
+ * compete with the LCP image for bandwidth.
+ *
+ * Shopify CDN URLs get a width param; local design files have a pre-generated
+ * `-800` sibling.
+ */
+export function cardImage(url: string | undefined, width = 800): string {
+  if (!url) return '';
+  if (url.includes('cdn.shopify.com') || url.includes('/cdn/shop/')) {
+    return shopifyImage(url, width);
+  }
+  return url.replace(/(\.[a-z0-9]+)$/i, `-${width}$1`);
+}

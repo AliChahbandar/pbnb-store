@@ -184,7 +184,7 @@ const jsonLd = [
           ) : (
             <div class="grid grid--col">
               {products.map((p, i) => (
-                <ProductCard product={p} priority={i < 2} />
+                <ProductCard product={p} priority={i === 0} />
               ))}
             </div>
           )

@@ -61,7 +61,7 @@ const suggestions = ['Star', 'Moth', 'Charcoal', 'Bone', 'Denim', 'Hoodie'];
           {results.length > 0 ? (
             <div class="grid srch__grid">
               {results.map((p, i) => (
-                <ProductCard product={p} priority={i < 2} />
+                <ProductCard product={p} priority={i === 0} />
               ))}
             </div>
           ) : (
