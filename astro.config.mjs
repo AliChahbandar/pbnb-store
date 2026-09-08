@@ -10,6 +10,11 @@ export default defineConfig({
   site: 'https://pbnb.store',
   output: 'server',
   adapter: cloudflare({ imageService: 'compile' }),
+  // We manage the cart id in our own signed cookie, so Astro sessions are not
+  // used. Leaving them on makes the Cloudflare adapter demand a KV binding —
+  // and its generated session-driver module single-quotes the project path,
+  // which breaks outright on a directory containing an apostrophe.
+  session: false,
   integrations: [sitemap({ filter: (page) => !page.includes('/cart') && !page.includes('/search') })],
   vite: { build: { assetsInlineLimit: 0 } },
 });

@@ -1,0 +1,184 @@
+---
+import type { Product } from '../lib/types';
+import { galleryFor, optionValues, colorSwatch } from '../lib/catalog';
+import { priceRange } from '../lib/money';
+
+export interface Props {
+  product: Product;
+  /** first card in the grid gets eager loading + high priority */
+  priority?: boolean;
+}
+
+const { product, priority = false } = Astro.props;
+
+const colors = optionValues(product, 'Color');
+// One lead image per colourway, so hovering a swatch swaps the card art.
+const perColor = (colors.length ? colors : [null]).map((c) => ({
+  color: c,
+  image: galleryFor(product, c)[0] ?? product.featuredImage,
+}));
+
+const soldOut = !product.availableForSale;
+const isNew = product.tags.includes('new');
+---
+
+<article class="card">
+  <a class="card__link" href={`/products/${product.handle}`}>
+    <div class="media card__media">
+      {
+        perColor.map((pc, i) => (
+          <img
+            class="im"
+            src={pc.image?.url}
+            alt={i === 0 ? (pc.image?.altText ?? product.title) : ''}
+            width={pc.image?.width ?? 1600}
+            height={pc.image?.height ?? 1600}
+            loading={priority && i === 0 ? 'eager' : 'lazy'}
+            fetchpriority={priority && i === 0 ? 'high' : 'auto'}
+            decoding={priority && i === 0 ? 'sync' : 'async'}
+          />
+        ))
+      }
+      {soldOut && <span class="card__flag">Sold out</span>}
+      {!soldOut && isNew && <span class="card__flag card__flag--new">New</span>}
+    </div>
+
+    <div class="card__meta">
+      <h3 class="card__title">{product.title}</h3>
+      <p class="card__price">
+        {priceRange(product.priceRange.minVariantPrice, product.priceRange.maxVariantPrice)}
+      </p>
+    </div>
+  </a>
+
+  {
+    colors.length > 1 && (
+      <ul class="card__sw" aria-label={`Colours available for ${product.title}`}>
+        {colors.map((c) => (
+          <li>
+            <a
+              class="sw"
+              href={`/products/${product.handle}?color=${encodeURIComponent(c)}`}
+              style={`--chip:${colorSwatch(c)}`}
+              aria-label={`${product.title} in ${c}`}
+            >
+              <span class="visually-hidden">{c}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</article>
+
+<style>
+  .card {
+    display: grid;
+    gap: 0.7rem;
+  }
+  .card__link {
+    display: grid;
+    gap: 0.7rem;
+  }
+  .card__media {
+    position: relative;
+  }
+  .im {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .im:first-child {
+    opacity: 1;
+  }
+  /* Second image of the default colourway on card hover — a quick back view. */
+  .card__link:hover .im:first-child {
+    opacity: 1;
+  }
+
+  /* Swatch hover swaps the card art. Pure CSS, no JS, and it also fires on
+     keyboard focus so the behaviour isn't mouse-only. */
+  .card:has(.sw:hover) .im:first-child,
+  .card:has(.sw:focus-visible) .im:first-child {
+    opacity: 0;
+  }
+  .card:has(.card__sw li:nth-child(1) .sw:hover) .im:nth-child(1),
+  .card:has(.card__sw li:nth-child(1) .sw:focus-visible) .im:nth-child(1),
+  .card:has(.card__sw li:nth-child(2) .sw:hover) .im:nth-child(2),
+  .card:has(.card__sw li:nth-child(2) .sw:focus-visible) .im:nth-child(2),
+  .card:has(.card__sw li:nth-child(3) .sw:hover) .im:nth-child(3),
+  .card:has(.card__sw li:nth-child(3) .sw:focus-visible) .im:nth-child(3),
+  .card:has(.card__sw li:nth-child(4) .sw:hover) .im:nth-child(4),
+  .card:has(.card__sw li:nth-child(4) .sw:focus-visible) .im:nth-child(4),
+  .card:has(.card__sw li:nth-child(5) .sw:hover) .im:nth-child(5),
+  .card:has(.card__sw li:nth-child(5) .sw:focus-visible) .im:nth-child(5),
+  .card:has(.card__sw li:nth-child(6) .sw:hover) .im:nth-child(6),
+  .card:has(.card__sw li:nth-child(6) .sw:focus-visible) .im:nth-child(6) {
+    opacity: 1;
+  }
+
+  .card__flag {
+    position: absolute;
+    inset-block-start: 0.6rem;
+    inset-inline-start: 0.6rem;
+    z-index: 2;
+    padding: 0.25rem 0.5rem;
+    background: var(--charcoal);
+    color: var(--bone);
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-radius: var(--radius);
+  }
+  .card__flag--new {
+    background: var(--berry);
+    color: #fff;
+  }
+
+  .card__meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+  }
+  .card__title {
+    font-family: var(--body);
+    font-size: var(--step-0);
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+  .card__price {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+
+  .card__sw {
+    display: flex;
+    gap: 0.4rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .sw {
+    display: block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--chip);
+    border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .sw:hover,
+  .sw:focus-visible {
+    transform: scale(1.18);
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--ink-dim);
+  }
+</style>

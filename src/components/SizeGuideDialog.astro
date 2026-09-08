@@ -1,0 +1,177 @@
+---
+import type { SizeChart } from '../lib/types';
+
+export interface Props {
+  chart: SizeChart;
+}
+const { chart } = Astro.props;
+
+const cell = (row: (typeof chart.rows)[number], col: string) => {
+  const k = col.toLowerCase();
+  if (k.startsWith('size')) return row.size;
+  if (k.startsWith('chest')) return row.chest;
+  if (k.startsWith('body') || k.startsWith('length')) return row.length;
+  if (k.startsWith('sleeve')) return row.sleeve;
+  if (k.startsWith('waist')) return row.waist;
+  if (k.startsWith('inseam')) return row.inseam;
+  if (k.startsWith('rise')) return row.rise;
+  return '';
+};
+---
+
+<dialog class="sg" data-size-guide aria-labelledby="sg-title">
+  <div class="sg__inner">
+    <header class="sg__head">
+      <h2 class="h3" id="sg-title">{chart.title}</h2>
+      <button class="sg__close" type="button" data-close-size-guide aria-label="Close size guide">
+        &times;
+      </button>
+    </header>
+
+    <div class="sg__scroll">
+      <table class="sg__table">
+        <caption class="visually-hidden">
+          {chart.title} measurements in inches
+        </caption>
+        <thead>
+          <tr>
+            {chart.columns.map((c) => <th scope="col">{c}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {
+            chart.rows.map((row) => (
+              <tr class={row.measured ? 'is-measured' : ''}>
+                {chart.columns.map((c, i) =>
+                  i === 0 ? (
+                    <th scope="row">
+                      {row.size}
+                      {row.measured && <span class="sg__badge">measured</span>}
+                    </th>
+                  ) : (
+                    <td>{cell(row, c)}</td>
+                  ),
+                )}
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    {chart.note && <p class="sg__note">{chart.note}</p>}
+
+    <p class="sg__how">
+      <strong>How to measure:</strong> lay a garment you already like flat, smooth out the wrinkles,
+      and measure straight across — pit to pit for chest, top of the shoulder seam down for length.
+      Compare those numbers to the table rather than to your body measurements.
+    </p>
+  </div>
+</dialog>
+
+<script>
+  const dlg = document.querySelector<HTMLDialogElement>('[data-size-guide]');
+  const openers = document.querySelectorAll<HTMLButtonElement>('[data-open-size-guide]');
+  const closer = document.querySelector<HTMLButtonElement>('[data-close-size-guide]');
+
+  openers.forEach((b) =>
+    b.addEventListener('click', () => {
+      dlg?.showModal();
+      closer?.focus();
+    }),
+  );
+  closer?.addEventListener('click', () => dlg?.close());
+  // Click on the backdrop (outside .sg__inner) closes.
+  dlg?.addEventListener('click', (e) => {
+    if (e.target === dlg) dlg.close();
+  });
+</script>
+
+<style>
+  .sg {
+    width: min(720px, calc(100vw - 2rem));
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    color: var(--ink);
+  }
+  .sg::backdrop {
+    background: rgb(0 0 0 / 0.66);
+    backdrop-filter: blur(2px);
+  }
+  .sg__inner {
+    padding: clamp(1.25rem, 3vw, 2rem);
+  }
+  .sg__head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-block-end: 1.25rem;
+  }
+  .sg__close {
+    background: none;
+    border: 0;
+    font-size: 1.75rem;
+    line-height: 1;
+    color: var(--ink-dim);
+    cursor: pointer;
+    padding: 0.1rem 0.4rem;
+  }
+  .sg__close:hover {
+    color: var(--ink);
+  }
+  /* Wide tables scroll inside their own box; the page never scrolls sideways. */
+  .sg__scroll {
+    overflow-x: auto;
+  }
+  .sg__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    white-space: nowrap;
+  }
+  .sg__table th,
+  .sg__table td {
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    border-block-end: 1px solid var(--rule-soft);
+  }
+  .sg__table thead th {
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.7rem;
+    border-block-end-color: var(--rule);
+  }
+  .sg__table tbody th {
+    font-weight: 700;
+  }
+  .is-measured {
+    background: color-mix(in srgb, var(--orange) 9%, transparent);
+  }
+  .sg__badge {
+    margin-inline-start: 0.5rem;
+    padding: 0.1rem 0.35rem;
+    background: var(--orange);
+    color: var(--charcoal);
+    border-radius: var(--radius);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .sg__note,
+  .sg__how {
+    margin-block-start: 1rem;
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+  }
+  .sg__note {
+    padding: 0.85rem 1rem;
+    background: var(--bg-sunken);
+    border-inline-start: 2px solid var(--orange);
+    border-radius: var(--radius);
+  }
+</style>

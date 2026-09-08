@@ -1,0 +1,722 @@
+---
+import Base from '../../layouts/Base.astro';
+import SizeGuideDialog from '../../components/SizeGuideDialog.astro';
+import {
+  getProduct,
+  optionValues,
+  colorSwatch,
+  galleryFor,
+  exactVariant,
+  getSizeChart,
+  LOW_STOCK_THRESHOLD,
+} from '../../lib/catalog';
+import { money } from '../../lib/money';
+import { gidTail } from '../../lib/shopify';
+
+const { handle } = Astro.params;
+const { data: product, fixture } = await getProduct(handle!, {
+  request: Astro.request,
+  locals: Astro.locals,
+});
+
+if (!product) return Astro.rewrite('/404');
+
+const colors = optionValues(product, 'Color');
+const sizes = optionValues(product, 'Size');
+const hasSizes = sizes.length > 0;
+
+// Selection comes from the URL, so a chosen variant is linkable and shareable.
+const qp = Astro.url.searchParams;
+const selColor = colors.includes(qp.get('color') ?? '') ? qp.get('color')! : (colors[0] ?? '');
+const requestedSize = qp.get('size') ?? '';
+
+/** Availability of every size within the selected colourway. */
+type SizeState = { size: string; state: 'ok' | 'low' | 'out' | 'unavailable'; qty: number | null; variantId: string | null };
+const sizeStates: SizeState[] = (hasSizes ? sizes : ['One Size']).map((size) => {
+  const v = exactVariant(product, hasSizes ? { Color: selColor, Size: size } : { Color: selColor });
+  if (!v) return { size, state: 'unavailable', qty: null, variantId: null };
+  if (!v.availableForSale) return { size, state: 'out', qty: 0, variantId: v.id };
+  const q = v.quantityAvailable;
+  return {
+    size,
+    state: q !== null && q > 0 && q <= LOW_STOCK_THRESHOLD ? 'low' : 'ok',
+    qty: q,
+    variantId: v.id,
+  };
+});
+
+// Default to the requested size, else the first buyable one.
+const chosen =
+  sizeStates.find((s) => s.size === requestedSize && s.state !== 'unavailable') ??
+  sizeStates.find((s) => s.state === 'ok' || s.state === 'low') ??
+  sizeStates.find((s) => s.state === 'out') ??
+  null;
+
+const variant = chosen?.variantId
+  ? (product.variants.find((v) => v.id === chosen.variantId) ?? null)
+  : null;
+
+const gallery = galleryFor(product, selColor);
+const sizeChart = getSizeChart(product.sizeChartKey);
+const price = variant?.price ?? product.priceRange.minVariantPrice;
+const canBuy = chosen?.state === 'ok' || chosen?.state === 'low';
+
+// Client payload: every colour's gallery + every variant's state, so selection
+// swaps instantly without another round trip.
+const payload = {
+  handle: product.handle,
+  hasSizes,
+  variants: product.variants.map((v) => ({
+    id: v.id,
+    color: v.selectedOptions.find((o) => o.name === 'Color')?.value ?? '',
+    size: v.selectedOptions.find((o) => o.name === 'Size')?.value ?? 'One Size',
+    available: v.availableForSale,
+    qty: v.quantityAvailable,
+    price: money(v.price),
+  })),
+  lowThreshold: LOW_STOCK_THRESHOLD,
+};
+
+const siteUrl = Astro.site ?? new URL('https://pbnb.store');
+const canonical = new URL(`/products/${product.handle}`, siteUrl).href;
+const abs = (u?: string | null) => (u ? new URL(u, siteUrl).href : undefined);
+
+// Product JSON-LD with one offer per variant, as asked.
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    description: product.seo.description ?? product.description.slice(0, 300),
+    sku: product.variants[0]?.sku ?? undefined,
+    brand: { '@type': 'Brand', name: 'PB&B' },
+    image: gallery.map((g) => abs(g.url)).filter(Boolean),
+    url: canonical,
+    offers: product.variants.map((v) => ({
+      '@type': 'Offer',
+      url: `${canonical}?color=${encodeURIComponent(
+        v.selectedOptions.find((o) => o.name === 'Color')?.value ?? '',
+      )}${hasSizes ? `&size=${encodeURIComponent(v.selectedOptions.find((o) => o.name === 'Size')?.value ?? '')}` : ''}`,
+      sku: v.sku ?? undefined,
+      price: v.price.amount,
+      priceCurrency: v.price.currencyCode,
+      availability: v.availableForSale
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      itemCondition: 'https://schema.org/NewCondition',
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl.href },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: product.productType || 'Shop',
+        item: new URL(`/collections/${(product.productType || 'all').toLowerCase()}`, siteUrl).href,
+      },
+      { '@type': 'ListItem', position: 3, name: product.title, item: canonical },
+    ],
+  },
+];
+---
+
+<Base
+  title={product.seo.title ?? product.title}
+  description={product.seo.description ?? product.description.slice(0, 155)}
+  image={gallery[0]?.url ?? '/og-default.png'}
+  ogType="product"
+  motion={false}
+  jsonLd={jsonLd}
+>
+  <div class="wrap pdp">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="/">Home</a>
+      <span aria-hidden="true">/</span>
+      <a href={`/collections/${(product.productType || 'all').toLowerCase()}`}>
+        {product.productType || 'Shop'}
+      </a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{product.title}</span>
+    </nav>
+
+    <div class="pdp__grid">
+      <!-- GALLERY
+           One gallery per colourway is rendered server-side and the inactive
+           ones are hidden. Swapping colour toggles `hidden` rather than
+           rebuilding the DOM, which keeps Astro's scoped styles attached and
+           means the correct set is already in the markup without JS. -->
+      <div class="gals">
+        {
+          (colors.length ? colors : ['']).map((c) => {
+            const imgs = galleryFor(product, c || null);
+            const active = (c || '') === selColor;
+            return (
+              <div class="gal" data-gallery data-color={c} hidden={!active}>
+                {imgs.map((img, i) => (
+                  <figure class="media gal__fig">
+                    <img
+                      src={img.url}
+                      alt={img.altText ?? product.title}
+                      width={img.width ?? 1600}
+                      height={img.height ?? 1600}
+                      loading={active && i === 0 ? 'eager' : 'lazy'}
+                      fetchpriority={active && i === 0 ? 'high' : 'auto'}
+                      decoding={active && i === 0 ? 'sync' : 'async'}
+                    />
+                  </figure>
+                ))}
+              </div>
+            );
+          })
+        }
+      </div>
+
+      <!-- BUY -->
+      <div class="buy">
+        <div class="buy__sticky">
+          <h1 class="h3 buy__title">{product.title}</h1>
+          <p class="buy__price" data-price>{money(price)}</p>
+
+          <form class="buy__form" method="POST" action="/api/cart">
+            <input type="hidden" name="action" value="add" />
+            <input type="hidden" name="variantId" value={variant?.id ?? ''} data-variant-input />
+            <input type="hidden" name="redirect" value={Astro.url.pathname + Astro.url.search} />
+
+            {/* COLOUR */}
+            {
+              colors.length > 0 && (
+                <fieldset class="opt">
+                  <legend class="opt__legend">
+                    Colour
+                    <span class="opt__value" data-color-label>
+                      {selColor}
+                    </span>
+                  </legend>
+                  <ul class="opt__list">
+                    {colors.map((c) => {
+                      const on = c === selColor;
+                      const params = new URLSearchParams();
+                      params.set('color', c);
+                      if (hasSizes && chosen) params.set('size', chosen.size);
+                      return (
+                        <li>
+                          <a
+                            class={`swatch${on ? ' swatch--on' : ''}`}
+                            href={`?${params.toString()}`}
+                            style={`--chip:${colorSwatch(c)}`}
+                            aria-pressed={on ? 'true' : 'false'}
+                            data-color={c}
+                            title={c}
+                          >
+                            <span class="visually-hidden">{c}</span>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </fieldset>
+              )
+            }
+
+            {/* SIZE */}
+            {
+              hasSizes && (
+                <fieldset class="opt">
+                  <legend class="opt__legend">
+                    Size
+                    {sizeChart && (
+                      <button class="opt__guide" type="button" data-open-size-guide>
+                        Size guide
+                      </button>
+                    )}
+                  </legend>
+                  <ul class="opt__list opt__list--sizes">
+                    {sizeStates.map((s) => {
+                      const on = chosen?.size === s.size;
+                      const dead = s.state === 'unavailable' || s.state === 'out';
+                      const params = new URLSearchParams();
+                      if (selColor) params.set('color', selColor);
+                      params.set('size', s.size);
+                      const reason =
+                        s.state === 'out'
+                          ? `${s.size} is sold out in ${selColor}`
+                          : s.state === 'unavailable'
+                            ? `${s.size} isn't made in ${selColor}`
+                            : `${s.size}`;
+                      return (
+                        <li>
+                          <a
+                            class={`size size--${s.state}${on ? ' size--on' : ''}`}
+                            href={`?${params.toString()}`}
+                            aria-pressed={on ? 'true' : 'false'}
+                            aria-disabled={dead ? 'true' : undefined}
+                            data-size={s.size}
+                            data-state={s.state}
+                            title={reason}
+                          >
+                            <span aria-hidden="true">{s.size}</span>
+                            <span class="visually-hidden">{reason}</span>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {/* The reason is stated in text, not just implied by styling. */}
+                  <p class="opt__state" data-size-state>
+                    {chosen?.state === 'out' && (
+                      <span class="state state--out">
+                        {chosen.size} is sold out in {selColor}. We make it — it'll be back.
+                      </span>
+                    )}
+                    {chosen?.state === 'unavailable' && (
+                      <span class="state state--na">
+                        {chosen.size} isn't made in {selColor}. Try another colour.
+                      </span>
+                    )}
+                    {chosen?.state === 'low' && (
+                      <span class="state state--low">
+                        Only {chosen.qty} left in {chosen.size}.
+                      </span>
+                    )}
+                  </p>
+                </fieldset>
+              )
+            }
+
+            <button class="btn btn--accent btn--block buy__add" type="submit" disabled={!canBuy} data-add>
+              {canBuy ? 'Add to bag' : chosen?.state === 'out' ? 'Sold out' : 'Unavailable'}
+            </button>
+            <p class="buy__ship">Free US shipping over $150 · Free first exchange</p>
+          </form>
+
+          <!-- DETAILS -->
+          <div class="details">
+            <details open>
+              <summary>Details</summary>
+              <div class="details__body" set:html={product.descriptionHtml} />
+            </details>
+
+            {
+              product.fit && (
+                <details>
+                  <summary>Fit</summary>
+                  <div class="details__body">
+                    <p>{product.fit}</p>
+                    {product.modelInfo && <p class="details__model">{product.modelInfo}</p>}
+                  </div>
+                </details>
+              )
+            }
+
+            <details>
+              <summary>Fabric &amp; care</summary>
+              <div class="details__body">
+                <p><strong>Fabric:</strong> {product.fabric ?? '[FABRIC: FILL]'}</p>
+                {product.care && <p><strong>Care:</strong> {product.care}</p>}
+                {variant?.weight && (
+                  <p class="details__meta">
+                    Shipping weight: {variant.weight}
+                    {variant.weightUnit === 'GRAMS' ? 'g' : ` ${variant.weightUnit?.toLowerCase()}`} (estimated)
+                  </p>
+                )}
+                {variant?.sku && <p class="details__meta">SKU: {variant.sku}</p>}
+              </div>
+            </details>
+
+            <details>
+              <summary>Shipping &amp; returns</summary>
+              <div class="details__body">
+                <p>
+                  Orders ship within 2 business days. Free US shipping over $150. Your first
+                  exchange on any order is free — fit is the whole point.
+                </p>
+                <p><a class="details__link" href="/policies/refund">Full returns policy</a></p>
+              </div>
+            </details>
+          </div>
+
+          {fixture && (
+            <p class="fixture-note">
+              Local design catalogue — no Shopify Storefront token configured yet, so this variant
+              can't be added to a real cart.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {sizeChart && <SizeGuideDialog chart={sizeChart} />}
+
+  <script type="application/json" data-pdp set:html={JSON.stringify(payload)} />
+  <script>
+    // Progressive enhancement. Without JS every selector is a plain link and a
+    // full page load renders the correct state, so nothing here is required —
+    // it just removes the round trip and keeps focus where the user put it.
+    const el = document.querySelector<HTMLScriptElement>('script[data-pdp]');
+    if (el) {
+      type V = { id: string; color: string; size: string; available: boolean; qty: number | null; price: string };
+      const data = JSON.parse(el.textContent!) as {
+        hasSizes: boolean;
+        variants: V[];
+        lowThreshold: number;
+      };
+
+      const gals = document.querySelectorAll<HTMLElement>('[data-gallery]');
+      const priceEl = document.querySelector<HTMLElement>('[data-price]');
+      const colorLabel = document.querySelector<HTMLElement>('[data-color-label]');
+      const stateEl = document.querySelector<HTMLElement>('[data-size-state]');
+      const addBtn = document.querySelector<HTMLButtonElement>('[data-add]');
+      const variantInput = document.querySelector<HTMLInputElement>('[data-variant-input]');
+      const redirectInput = document.querySelector<HTMLInputElement>('input[name="redirect"]');
+
+      const url = new URL(location.href);
+      let color = url.searchParams.get('color') ?? document.querySelector<HTMLElement>('.swatch--on')?.dataset.color ?? '';
+      let size = url.searchParams.get('size') ?? document.querySelector<HTMLElement>('.size--on')?.dataset.size ?? '';
+
+      const stateOf = (v: V | undefined) =>
+        !v ? 'unavailable' : !v.available ? 'out' : v.qty !== null && v.qty > 0 && v.qty <= data.lowThreshold ? 'low' : 'ok';
+
+      function render() {
+        // Show the gallery for the active colourway, hide the rest.
+        gals.forEach((g) => {
+          g.hidden = (g.dataset.color ?? '') !== color;
+        });
+        if (colorLabel) colorLabel.textContent = color;
+
+        // size buttons for this colour
+        document.querySelectorAll<HTMLAnchorElement>('.size').forEach((a) => {
+          const s = a.dataset.size!;
+          const v = data.variants.find((x) => x.color === color && x.size === s);
+          const st = stateOf(v);
+          a.className = `size size--${st}${s === size ? ' size--on' : ''}`;
+          a.dataset.state = st;
+          a.setAttribute('aria-pressed', s === size ? 'true' : 'false');
+          if (st === 'out' || st === 'unavailable') a.setAttribute('aria-disabled', 'true');
+          else a.removeAttribute('aria-disabled');
+          const p = new URLSearchParams();
+          if (color) p.set('color', color);
+          p.set('size', s);
+          a.setAttribute('href', `?${p.toString()}`);
+          a.title =
+            st === 'out' ? `${s} is sold out in ${color}` : st === 'unavailable' ? `${s} isn't made in ${color}` : s;
+        });
+
+        document.querySelectorAll<HTMLAnchorElement>('.swatch').forEach((a) => {
+          const on = a.dataset.color === color;
+          a.classList.toggle('swatch--on', on);
+          a.setAttribute('aria-pressed', on ? 'true' : 'false');
+          const p = new URLSearchParams();
+          p.set('color', a.dataset.color!);
+          if (data.hasSizes && size) p.set('size', size);
+          a.setAttribute('href', `?${p.toString()}`);
+        });
+
+        const cur = data.variants.find((x) => x.color === color && (!data.hasSizes || x.size === size));
+        const st = stateOf(cur);
+        if (priceEl && cur) priceEl.textContent = cur.price;
+        if (variantInput) variantInput.value = cur?.id ?? '';
+        if (addBtn) {
+          const buyable = st === 'ok' || st === 'low';
+          addBtn.disabled = !buyable;
+          addBtn.textContent = buyable ? 'Add to bag' : st === 'out' ? 'Sold out' : 'Unavailable';
+        }
+        if (stateEl) {
+          stateEl.innerHTML =
+            st === 'out'
+              ? `<span class="state state--out">${size} is sold out in ${color}. We make it — it'll be back.</span>`
+              : st === 'unavailable'
+                ? `<span class="state state--na">${size} isn't made in ${color}. Try another colour.</span>`
+                : st === 'low'
+                  ? `<span class="state state--low">Only ${cur!.qty} left in ${size}.</span>`
+                  : '';
+        }
+
+        const next = new URL(location.href);
+        if (color) next.searchParams.set('color', color);
+        if (data.hasSizes && size) next.searchParams.set('size', size);
+        history.replaceState({}, '', next);
+        if (redirectInput) redirectInput.value = next.pathname + next.search;
+      }
+
+      document.addEventListener('click', (e) => {
+        const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('.swatch, .size');
+        if (!a) return;
+        e.preventDefault();
+        if (a.classList.contains('swatch')) color = a.dataset.color!;
+        else {
+          if (a.getAttribute('aria-disabled') === 'true') return;
+          size = a.dataset.size!;
+        }
+        render();
+        a.focus();
+      });
+
+      render();
+    }
+  </script>
+</Base>
+
+<style>
+  .pdp {
+    padding-block: clamp(1rem, 3vw, 2rem) clamp(2rem, 5vw, 4rem);
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    margin-block-end: clamp(1rem, 3vw, 2rem);
+  }
+  .crumbs a:hover {
+    color: var(--ink-dim);
+    text-decoration: underline;
+  }
+
+  .pdp__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 4rem);
+    align-items: start;
+  }
+  .gal {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gal[hidden] {
+    display: none;
+  }
+  .gal__fig {
+    margin: 0;
+  }
+  .gal__fig:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .buy__sticky {
+    position: sticky;
+    top: 84px;
+  }
+  .buy__title {
+    letter-spacing: -0.02em;
+  }
+  .buy__price {
+    font-family: var(--mono);
+    font-size: var(--step-1);
+    color: var(--ink-dim);
+    margin-block-start: 0.5rem;
+  }
+  .buy__form {
+    margin-block-start: clamp(1.25rem, 3vw, 2rem);
+    display: grid;
+    gap: 1.5rem;
+  }
+  .opt {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .opt__legend {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    width: 100%;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-block-end: 0.75rem;
+    padding: 0;
+  }
+  .opt__value {
+    color: var(--ink);
+    letter-spacing: 0.06em;
+  }
+  .opt__guide {
+    margin-inline-start: auto;
+    background: none;
+    border: 0;
+    padding: 0;
+    font-family: var(--mono);
+    font-size: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: var(--rose);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .opt__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .swatch {
+    display: block;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--chip);
+    border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .swatch:hover {
+    transform: scale(1.06);
+  }
+  .swatch--on {
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--bone);
+  }
+
+  .size {
+    display: grid;
+    place-items: center;
+    min-width: 52px;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .size:hover:not([aria-disabled='true']) {
+    border-color: var(--ink-faint);
+    color: var(--ink);
+  }
+  .size--on {
+    background: var(--bone);
+    border-color: var(--bone);
+    color: var(--charcoal);
+    font-weight: 700;
+  }
+  /* Sold out and not-made read differently on purpose: a struck size is one we
+     make and ran out of; a faded size is one that colourway never had. */
+  .size--out {
+    color: var(--ink-faint);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+  .size--unavailable {
+    color: color-mix(in srgb, var(--ink-faint) 60%, transparent);
+    border-color: var(--rule-soft);
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .size--on.size--out {
+    background: transparent;
+    color: var(--ink-faint);
+  }
+
+  .opt__state {
+    margin-block-start: 0.85rem;
+    min-height: 1.4em;
+    font-size: var(--step--1);
+  }
+  .state--out {
+    color: var(--rose);
+  }
+  .state--na {
+    color: var(--ink-faint);
+  }
+  .state--low {
+    color: var(--orange);
+  }
+
+  .buy__add {
+    margin-block-start: 0.25rem;
+  }
+  .buy__ship {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+
+  .details {
+    margin-block-start: clamp(1.5rem, 3vw, 2.5rem);
+    border-block-start: 1px solid var(--rule);
+  }
+  .details details {
+    border-block-end: 1px solid var(--rule);
+  }
+  .details summary {
+    padding-block: 1rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .details summary::-webkit-details-marker {
+    display: none;
+  }
+  .details summary::after {
+    content: '+';
+    font-size: 1.1rem;
+    color: var(--ink-faint);
+  }
+  .details details[open] summary::after {
+    content: '–';
+  }
+  .details__body {
+    padding-block-end: 1.25rem;
+    color: var(--ink-dim);
+    display: grid;
+    gap: 0.8rem;
+  }
+  .details__meta {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+  }
+  .details__model {
+    font-style: italic;
+  }
+  .details__link {
+    color: var(--rose);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .fixture-note {
+    margin-block-start: 1.5rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    border-block-start: 1px dashed var(--rule);
+    padding-block-start: 1rem;
+  }
+
+  @media (max-width: 900px) {
+    .pdp__grid {
+      grid-template-columns: 1fr;
+    }
+    .buy__sticky {
+      position: static;
+    }
+    .gal {
+      grid-template-columns: 1fr;
+    }
+    .gal__fig:first-child {
+      grid-column: auto;
+    }
+  }
+</style>

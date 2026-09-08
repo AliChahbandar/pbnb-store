@@ -1,0 +1,308 @@
+---
+import Base from '../layouts/Base.astro';
+import { CART_COOKIE, getCart, lineOptions } from '../lib/cart';
+import { money } from '../lib/money';
+
+const cartId = Astro.cookies.get(CART_COOKIE)?.value ?? null;
+const { cart, unconfigured } = await getCart(cartId, {
+  request: Astro.request,
+  locals: Astro.locals,
+});
+const err = Astro.url.searchParams.get('cart_error');
+const lines = cart?.lines ?? [];
+---
+
+<Base
+  title="Your bag"
+  description="Review your PB&B bag before checkout."
+  motion={false}
+  noindex={true}
+>
+  <div class="wrap cart">
+    <h1 class="h2">Your bag</h1>
+
+    {err && <p class="alert" role="alert">{err}</p>}
+
+    {
+      lines.length === 0 ? (
+        <div class="cart__empty">
+          <p class="lede">
+            {unconfigured
+              ? 'The store isn’t connected to Shopify yet, so the bag is inactive.'
+              : 'Nothing in the bag yet.'}
+          </p>
+          <a class="btn" href="/collections/all">
+            Start shopping
+          </a>
+        </div>
+      ) : (
+        <div class="cart__grid">
+          <ul class="lines">
+            {lines.map((line) => (
+              <li class="line">
+                <a class="line__img media" href={`/products/${line.merchandise.product.handle}`}>
+                  <img
+                    src={line.merchandise.image?.url ?? line.merchandise.product.featuredImage?.url}
+                    alt={line.merchandise.image?.altText ?? line.merchandise.product.title}
+                    width="200"
+                    height="200"
+                    loading="lazy"
+                  />
+                </a>
+
+                <div class="line__body">
+                  <div class="line__top">
+                    <div>
+                      <h2 class="line__title">
+                        <a href={`/products/${line.merchandise.product.handle}`}>
+                          {line.merchandise.product.title}
+                        </a>
+                      </h2>
+                      {/* Size and colour are the two things a buyer checks before paying. */}
+                      <p class="line__opts">{lineOptions(line)}</p>
+                    </div>
+                    <p class="line__price">{money(line.cost.totalAmount)}</p>
+                  </div>
+
+                  <div class="line__actions">
+                    <form method="POST" action="/api/cart" class="qty">
+                      <input type="hidden" name="action" value="update" />
+                      <input type="hidden" name="lineId" value={line.id} />
+                      <input type="hidden" name="redirect" value="/cart" />
+                      <label class="visually-hidden" for={`q-${line.id}`}>
+                        Quantity for {line.merchandise.product.title}
+                      </label>
+                      <input
+                        class="qty__input"
+                        id={`q-${line.id}`}
+                        type="number"
+                        name="quantity"
+                        min="0"
+                        max="99"
+                        value={line.quantity}
+                        inputmode="numeric"
+                      />
+                      <button class="qty__go" type="submit">
+                        Update
+                      </button>
+                    </form>
+
+                    <form method="POST" action="/api/cart">
+                      <input type="hidden" name="action" value="remove" />
+                      <input type="hidden" name="lineId" value={line.id} />
+                      <input type="hidden" name="redirect" value="/cart" />
+                      <button class="line__remove" type="submit">
+                        Remove
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <aside class="summary">
+            <h2 class="eyebrow">Summary</h2>
+            <dl class="summary__rows">
+              <div>
+                <dt>Subtotal</dt>
+                <dd>{money(cart!.cost.subtotalAmount)}</dd>
+              </div>
+              {cart!.cost.totalTaxAmount && (
+                <div>
+                  <dt>Tax</dt>
+                  <dd>{money(cart!.cost.totalTaxAmount)}</dd>
+                </div>
+              )}
+              <div class="summary__total">
+                <dt>Total</dt>
+                <dd>{money(cart!.cost.totalAmount)}</dd>
+              </div>
+            </dl>
+            <p class="summary__note">
+              Shipping and taxes are calculated at checkout, where your address is known.
+            </p>
+            {/* Straight to Shopify's hosted checkout. Nothing here intercepts it. */}
+            <a class="btn btn--accent btn--block" href={cart!.checkoutUrl} rel="nofollow">
+              Checkout
+            </a>
+            <a class="summary__back" href="/collections/all">
+              Keep shopping
+            </a>
+          </aside>
+        </div>
+      )
+    }
+  </div>
+</Base>
+
+<style>
+  .cart {
+    padding-block: clamp(1.5rem, 4vw, 3rem) clamp(2rem, 6vw, 5rem);
+  }
+  .cart h1 {
+    margin-block-end: clamp(1.5rem, 4vw, 2.5rem);
+  }
+  .alert {
+    padding: 0.85rem 1rem;
+    margin-block-end: 1.5rem;
+    background: color-mix(in srgb, var(--berry) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--berry) 42%, transparent);
+    border-radius: var(--radius);
+    color: var(--rose);
+    font-size: var(--step--1);
+  }
+  .cart__empty {
+    display: grid;
+    gap: 1.5rem;
+    justify-items: start;
+    padding-block: clamp(2rem, 6vw, 4rem);
+  }
+  .cart__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    align-items: start;
+  }
+  .lines {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 1.25rem;
+  }
+  .line {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    gap: 1.1rem;
+    padding-block-end: 1.25rem;
+    border-block-end: 1px solid var(--rule-soft);
+  }
+  .line__img {
+    aspect-ratio: 1;
+  }
+  .line__top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .line__title {
+    font-family: var(--body);
+    font-size: var(--step-0);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .line__title a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .line__opts {
+    margin-block-start: 0.3rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+  }
+  .line__price {
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
+  .line__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-block-start: 1rem;
+  }
+  .qty {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .qty__input {
+    width: 62px;
+    padding: 0.45rem 0.5rem;
+    background: var(--bg-sunken);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    color: var(--ink);
+    font-family: var(--mono);
+    text-align: center;
+  }
+  .qty__go,
+  .line__remove {
+    background: none;
+    border: 0;
+    padding: 0.45rem 0.2rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  .qty__go:hover,
+  .line__remove:hover {
+    color: var(--ink);
+  }
+  .line__remove {
+    color: var(--ink-faint);
+  }
+
+  .summary {
+    position: sticky;
+    top: 84px;
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+  }
+  .summary__rows {
+    margin-block: 1.25rem;
+    display: grid;
+    gap: 0.6rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+  }
+  .summary__rows > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .summary__rows dt {
+    color: var(--ink-dim);
+  }
+  .summary__total {
+    padding-block-start: 0.6rem;
+    border-block-start: 1px solid var(--rule);
+    font-size: var(--step-0);
+    font-weight: 700;
+  }
+  .summary__note {
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    margin-block-end: 1.1rem;
+  }
+  .summary__back {
+    display: block;
+    text-align: center;
+    margin-block-start: 0.85rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (max-width: 860px) {
+    .cart__grid {
+      grid-template-columns: 1fr;
+    }
+    .summary {
+      position: static;
+    }
+  }
+  @media (max-width: 460px) {
+    .line {
+      grid-template-columns: 84px minmax(0, 1fr);
+    }
+  }
+</style>

@@ -1,0 +1,379 @@
+---
+import Base from '../../layouts/Base.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { getCollection, colorSwatch } from '../../lib/catalog';
+
+const { handle } = Astro.params;
+const url = Astro.url;
+const params = url.searchParams;
+
+// Multi-select facets, read straight off the query string.
+const sel = {
+  size: params.getAll('size'),
+  color: params.getAll('color'),
+  type: params.getAll('type'),
+};
+const after = params.get('after');
+const sort = params.get('sort') ?? '';
+
+// Translate the UI selection into Storefront ProductFilter inputs. `variantOption`
+// is how size/colour filtering is expressed; productType is its own key.
+const filters: Array<Record<string, unknown>> = [
+  ...sel.size.map((value) => ({ variantOption: { name: 'Size', value } })),
+  ...sel.color.map((value) => ({ variantOption: { name: 'Color', value } })),
+  ...sel.type.map((value) => ({ productType: value })),
+];
+
+const SORTS: Record<string, { sortKey: string; reverse: boolean }> = {
+  '': { sortKey: 'COLLECTION_DEFAULT', reverse: false },
+  'price-asc': { sortKey: 'PRICE', reverse: false },
+  'price-desc': { sortKey: 'PRICE', reverse: true },
+  newest: { sortKey: 'CREATED', reverse: true },
+  title: { sortKey: 'TITLE', reverse: false },
+};
+const sortCfg = SORTS[sort] ?? SORTS[''];
+
+const { data, fixture } = await getCollection(
+  handle!,
+  { first: 24, after, filters, sortKey: sortCfg!.sortKey, reverse: sortCfg!.reverse },
+  { request: Astro.request, locals: Astro.locals },
+);
+
+if (!data.collection) return Astro.rewrite('/404');
+
+const col = data.collection;
+const products = col.products;
+
+/** Build a URL with one facet value toggled on/off. */
+function toggle(kind: string, value: string): string {
+  const p = new URLSearchParams(url.search);
+  const cur = p.getAll(kind);
+  p.delete(kind);
+  for (const v of cur) if (v !== value) p.append(kind, v);
+  if (!cur.includes(value)) p.append(kind, value);
+  p.delete('after');
+  const q = p.toString();
+  return `${url.pathname}${q ? `?${q}` : ''}`;
+}
+function sortUrl(value: string): string {
+  const p = new URLSearchParams(url.search);
+  if (value) p.set('sort', value);
+  else p.delete('sort');
+  p.delete('after');
+  const q = p.toString();
+  return `${url.pathname}${q ? `?${q}` : ''}`;
+}
+function pageUrl(cursor: string): string {
+  const p = new URLSearchParams(url.search);
+  p.set('after', cursor);
+  return `${url.pathname}?${p.toString()}`;
+}
+const clearUrl = url.pathname;
+const activeCount = sel.size.length + sel.color.length + sel.type.length;
+
+const facetKind: Record<string, 'size' | 'color' | 'type'> = {
+  Size: 'size',
+  Color: 'color',
+  Type: 'type',
+};
+
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: col.title,
+    description: col.description,
+    url: new URL(url.pathname, Astro.site ?? 'https://pbnb.store').href,
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: products.length,
+      itemListElement: products.map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: new URL(`/products/${p.handle}`, Astro.site ?? 'https://pbnb.store').href,
+        name: p.title,
+      })),
+    },
+  },
+];
+---
+
+<Base
+  title={col.seo.title ?? col.title}
+  description={col.seo.description ?? col.description ?? `Shop ${col.title} from PB&B.`}
+  image={products[0]?.featuredImage?.url ?? '/og-default.png'}
+  motion={false}
+  jsonLd={jsonLd}
+>
+  <div class="wrap col">
+    <header class="col__head">
+      <h1 class="h2">{col.title}</h1>
+      {col.description && <p class="lede">{col.description}</p>}
+    </header>
+
+    <div class="col__body">
+      <!-- FILTERS -->
+      <aside class="filters" aria-label="Filter products">
+        <div class="filters__top">
+          <h2 class="eyebrow">Filter</h2>
+          {activeCount > 0 && <a class="filters__clear" href={clearUrl}>Clear ({activeCount})</a>}
+        </div>
+
+        {
+          data.facets.map((facet) => {
+            const kind = facetKind[facet.name];
+            if (!kind) return null;
+            return (
+              <fieldset class="facet">
+                <legend>{facet.name}</legend>
+                <ul class={facet.name === 'Color' ? 'facet__list facet__list--sw' : 'facet__list'}>
+                  {facet.values.map((v) => {
+                    const on = sel[kind].includes(v.value);
+                    return (
+                      <li>
+                        <a
+                          class={`chip${on ? ' chip--on' : ''}`}
+                          href={toggle(kind, v.value)}
+                          aria-pressed={on ? 'true' : 'false'}
+                          rel="nofollow"
+                        >
+                          {facet.name === 'Color' && (
+                            <span class="chip__dot" style={`--chip:${colorSwatch(v.value)}`} />
+                          )}
+                          {v.value}
+                          <span class="chip__n">{v.count}</span>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </fieldset>
+            );
+          })
+        }
+      </aside>
+
+      <!-- RESULTS -->
+      <div class="results">
+        <div class="results__bar">
+          <p class="results__count">
+            {products.length}
+            {products.length === 1 ? ' product' : ' products'}
+          </p>
+          <nav class="sorts" aria-label="Sort">
+            {
+              [
+                ['', 'Featured'],
+                ['newest', 'Newest'],
+                ['price-asc', 'Price ↑'],
+                ['price-desc', 'Price ↓'],
+              ].map(([v, label]) => (
+                <a class={`sorts__a${sort === v ? ' sorts__a--on' : ''}`} href={sortUrl(v!)} rel="nofollow">
+                  {label}
+                </a>
+              ))
+            }
+          </nav>
+        </div>
+
+        {
+          products.length === 0 ? (
+            <p class="empty">
+              Nothing matches that combination. <a href={clearUrl}>Clear the filters</a> and try again.
+            </p>
+          ) : (
+            <div class="grid grid--col">
+              {products.map((p, i) => (
+                <ProductCard product={p} priority={i < 2} />
+              ))}
+            </div>
+          )
+        }
+
+        {
+          data.pageInfo.hasNextPage && data.pageInfo.endCursor && (
+            <nav class="pager" aria-label="Pagination">
+              <a class="btn btn--ghost" href={pageUrl(data.pageInfo.endCursor)} rel="next">
+                Load more
+              </a>
+            </nav>
+          )
+        }
+
+        {fixture && (
+          <p class="fixture-note">
+            Showing the local design catalogue — no Shopify Storefront token is configured yet.
+          </p>
+        )}
+      </div>
+    </div>
+  </div>
+</Base>
+
+<style>
+  .col {
+    padding-block: clamp(1.5rem, 4vw, 3rem);
+  }
+  .col__head {
+    margin-block-end: clamp(1.5rem, 4vw, 2.5rem);
+  }
+  .col__head .lede {
+    margin-block-start: 0.75rem;
+  }
+  .col__body {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: clamp(1.5rem, 3vw, 3rem);
+    align-items: start;
+  }
+
+  .filters {
+    position: sticky;
+    top: 84px;
+    display: grid;
+    gap: 1.5rem;
+  }
+  .filters__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .filters__clear {
+    font-size: var(--step--1);
+    color: var(--rose);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .facet {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .facet legend {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-block-end: 0.65rem;
+    padding: 0;
+  }
+  .facet__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .chip:hover {
+    color: var(--ink);
+    border-color: var(--ink-faint);
+  }
+  .chip--on {
+    background: var(--bone);
+    border-color: var(--bone);
+    color: var(--charcoal);
+    font-weight: 600;
+  }
+  .chip__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--chip);
+    border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  }
+  .chip__n {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    opacity: 0.62;
+  }
+
+  .results__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-block-end: 1rem;
+    margin-block-end: clamp(1rem, 2.5vw, 1.75rem);
+    border-block-end: 1px solid var(--rule-soft);
+  }
+  .results__count {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+  }
+  .sorts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+  }
+  .sorts__a {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    padding-block: 0.2rem;
+    border-block-end: 1px solid transparent;
+  }
+  .sorts__a:hover {
+    color: var(--ink-dim);
+  }
+  .sorts__a--on {
+    color: var(--ink);
+    border-block-end-color: var(--berry);
+  }
+
+  .grid--col {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .empty {
+    color: var(--ink-dim);
+    padding-block: 3rem;
+  }
+  .empty a {
+    color: var(--rose);
+    text-decoration: underline;
+  }
+  .pager {
+    display: flex;
+    justify-content: center;
+    margin-block-start: clamp(2rem, 4vw, 3.5rem);
+  }
+  .fixture-note {
+    margin-block-start: 2rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    border-block-start: 1px dashed var(--rule);
+    padding-block-start: 1rem;
+  }
+
+  @media (max-width: 1000px) {
+    .grid--col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 760px) {
+    .col__body {
+      grid-template-columns: 1fr;
+    }
+    .filters {
+      position: static;
+      padding-block-end: 1.25rem;
+      border-block-end: 1px solid var(--rule-soft);
+    }
+  }
+</style>

@@ -1,0 +1,98 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import AnnouncementBar from '../components/AnnouncementBar.astro';
+
+export interface Props {
+  title: string;
+  description: string;
+  /** Absolute or root-relative. Always emitted over https. */
+  image?: string;
+  /** 'website' | 'product' | 'article' */
+  ogType?: string;
+  /** Turn off scroll motion — set on collection, cart, search, checkout paths. */
+  motion?: boolean;
+  noindex?: boolean;
+  jsonLd?: unknown[];
+}
+
+const {
+  title,
+  description,
+  image = '/og-default.png',
+  ogType = 'website',
+  motion = true,
+  noindex = false,
+  jsonLd = [],
+} = Astro.props;
+
+const site = Astro.site ?? new URL('https://pbnb.store');
+const canonical = new URL(Astro.url.pathname, site).href.replace(/\/$/, '') || site.href;
+// og:image must be absolute and https — the old password page served it over http.
+const ogImage = new URL(image, site).href;
+
+const fullTitle = title.includes('PB&B') ? title : `${title} — PB&B`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex,nofollow" />}
+
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/mark.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#191817" />
+
+    <meta property="og:site_name" content="PB&B" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <link rel="preconnect" href="https://cdn.shopify.com" crossorigin />
+
+    {
+      jsonLd.map((block) => (
+        <script type="application/ld+json" set:html={JSON.stringify(block)} />
+      ))
+    }
+  </head>
+  <body data-motion={motion ? 'on' : 'off'}>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <AnnouncementBar />
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+
+    <script>
+      // Cart badge hydration — the header count is rendered server-side, but a
+      // client-side add needs to update it without a reload.
+      document.addEventListener('pbnb:cart', (e) => {
+        const detail = (e as CustomEvent<{ totalQuantity?: number }>).detail;
+        const badge = document.querySelector<HTMLElement>('[data-cart-count]');
+        if (badge && typeof detail?.totalQuantity === 'number') {
+          badge.textContent = String(detail.totalQuantity);
+          badge.hidden = detail.totalQuantity === 0;
+        }
+      });
+    </script>
+  </body>
+</html>

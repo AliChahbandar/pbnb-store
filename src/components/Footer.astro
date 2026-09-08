@@ -1,0 +1,166 @@
+---
+const year = new Date().getFullYear();
+
+const columns = [
+  {
+    title: 'Shop',
+    links: [
+      { href: '/collections/new', label: 'New' },
+      { href: '/collections/tees', label: 'Tees' },
+      { href: '/collections/hoodies', label: 'Hoodies' },
+      { href: '/collections/bottoms', label: 'Bottoms' },
+      { href: '/collections/accessories', label: 'Accessories' },
+    ],
+  },
+  {
+    title: 'Help',
+    links: [
+      { href: '/size-guide', label: 'Size guide' },
+      { href: '/policies/refund', label: 'Returns & exchanges' },
+      { href: '/policies/shipping', label: 'Shipping' },
+      { href: '/faq', label: 'FAQ' },
+      { href: '/contact', label: 'Contact' },
+    ],
+  },
+  {
+    title: 'Brand',
+    links: [
+      { href: '/about', label: 'About' },
+      { href: '/policies/terms', label: 'Terms of service' },
+      { href: '/policies/privacy', label: 'Privacy' },
+    ],
+  },
+];
+---
+
+<footer class="ft">
+  <div class="wrap">
+    <div class="ft__top">
+      <div class="ft__brand">
+        <img class="ft__logo" src="/logo-wordmark.svg" alt="PB&amp;B" width="1754" height="642" />
+        <p class="ft__line">
+          Heavyweight graphics, drawn by hand and printed big. Made in small runs.
+        </p>
+        <form class="ft__sub" action="/contact" method="get">
+          <label class="field">
+            <span>Get the next drop first</span>
+            <div class="ft__row">
+              <input
+                class="input"
+                type="email"
+                name="email"
+                required
+                autocomplete="email"
+                placeholder="you@email.com"
+                aria-label="Email address"
+              />
+              <button class="btn" type="submit">Join</button>
+            </div>
+          </label>
+        </form>
+      </div>
+
+      <nav class="ft__cols" aria-label="Footer">
+        {
+          columns.map((col) => (
+            <div>
+              <h2 class="eyebrow">{col.title}</h2>
+              <ul>
+                {col.links.map((l) => (
+                  <li>
+                    <a href={l.href}>{l.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </nav>
+    </div>
+
+    <div class="ft__base">
+      <p>&copy; {year} PB&amp;B. All rights reserved.</p>
+      <p class="ft__note">Prices in USD. Checkout is handled by Shopify.</p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .ft {
+    margin-block-start: var(--stack);
+    border-block-start: 1px solid var(--rule);
+    background: var(--bg-sunken);
+    padding-block: clamp(2.5rem, 5vw, 4.5rem) 2rem;
+  }
+  .ft__top {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
+    gap: clamp(2rem, 5vw, 5rem);
+  }
+  .ft__logo {
+    width: 132px;
+    height: auto;
+  }
+  .ft__line {
+    margin-block-start: 1rem;
+    color: var(--ink-dim);
+    max-width: 34ch;
+  }
+  .ft__sub {
+    margin-block-start: 1.75rem;
+    max-width: 30rem;
+  }
+  .ft__row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .ft__row .input {
+    flex: 1;
+  }
+  .ft__cols {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+  }
+  .ft__cols ul {
+    list-style: none;
+    padding: 0;
+    margin-block-start: 1rem;
+    display: grid;
+    gap: 0.6rem;
+  }
+  .ft__cols a {
+    color: var(--ink-dim);
+    transition: color 0.15s;
+  }
+  .ft__cols a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .ft__base {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-block-start: clamp(2.5rem, 5vw, 4rem);
+    padding-block-start: 1.5rem;
+    border-block-start: 1px solid var(--rule-soft);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 860px) {
+    .ft__top {
+      grid-template-columns: 1fr;
+    }
+    .ft__cols {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 420px) {
+    .ft__row {
+      flex-direction: column;
+    }
+  }
+</style>

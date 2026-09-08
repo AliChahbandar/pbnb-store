@@ -1,0 +1,51 @@
+---
+import { storefront } from '../lib/shopify';
+import { GET_METAOBJECT } from '../lib/queries';
+
+/**
+ * Copy comes from the `announcement_bar` metaobject so it can be edited in
+ * Shopify without a deploy. The fallback below is only used before the
+ * metaobject exists (it needs Admin credentials to create).
+ */
+const res = await storefront<{ metaobject: { fields: Array<{ key: string; value: string }> } | null }>({
+  query: GET_METAOBJECT,
+  variables: { handle: { type: 'announcement_bar', handle: 'current' } },
+  request: Astro.request,
+  locals: Astro.locals,
+  cacheSeconds: 120,
+});
+
+const fields = Object.fromEntries((res.data?.metaobject?.fields ?? []).map((f) => [f.key, f.value]));
+
+const enabled = fields.enabled ? fields.enabled === 'true' : true;
+const message = fields.message ?? 'Free US shipping over $150 · Exchanges are free within 30 days';
+const href = fields.link ?? '/policies/shipping';
+---
+
+{
+  enabled && (
+    <div class="ann">
+      <a href={href}>{message}</a>
+    </div>
+  )
+}
+
+<style>
+  .ann {
+    background: var(--berry);
+    color: #fff;
+    text-align: center;
+  }
+  .ann a {
+    display: block;
+    padding: 0.55rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .ann a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>

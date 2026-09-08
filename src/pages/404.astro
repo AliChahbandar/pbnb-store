@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+export const prerender = true;
+---
+<Base title="Page not found" description="That page doesn't exist." noindex={true} motion={false}>
+  <div class="wrap nf">
+    <p class="eyebrow">404</p>
+    <h1 class="h2">That page isn't here</h1>
+    <p class="lede">The link may be old, or the drop it pointed at has sold through.</p>
+    <div class="nf__cta">
+      <a class="btn" href="/collections/all">Shop everything</a>
+      <a class="btn btn--ghost" href="/">Home</a>
+    </div>
+  </div>
+</Base>
+<style>
+  .nf { padding-block: clamp(4rem, 14vw, 10rem); display: grid; gap: 1rem; justify-items: start; }
+  .nf__cta { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-block-start: 1rem; }
+</style>

@@ -1,0 +1,144 @@
+---
+import Base from '../layouts/Base.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { searchProducts } from '../lib/catalog';
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim();
+const { data: results } = q
+  ? await searchProducts(q, { request: Astro.request, locals: Astro.locals })
+  : { data: [] };
+
+const suggestions = ['Star', 'Moth', 'Charcoal', 'Bone', 'Denim', 'Hoodie'];
+---
+
+<Base
+  title={q ? `Search: ${q}` : 'Search'}
+  description="Search PB&B by product name or colour."
+  motion={false}
+  noindex={true}
+>
+  <div class="wrap srch">
+    <h1 class="h2">Search</h1>
+
+    <form class="srch__form" method="get" action="/search" role="search">
+      <label class="visually-hidden" for="q">Search products</label>
+      <input
+        class="input srch__input"
+        id="q"
+        type="search"
+        name="q"
+        value={q}
+        placeholder="Try a name or a colour — “moth”, “bone”"
+        autocomplete="off"
+        autofocus
+      />
+      <button class="btn" type="submit">Search</button>
+    </form>
+
+    {
+      !q && (
+        <div class="srch__hints">
+          <p class="eyebrow">Try</p>
+          <ul>
+            {suggestions.map((s) => (
+              <li>
+                <a class="tag" href={`/search?q=${encodeURIComponent(s)}`}>
+                  {s}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
+
+    {
+      q && (
+        <>
+          <p class="srch__count">
+            {results.length} {results.length === 1 ? 'result' : 'results'} for “{q}”
+          </p>
+          {results.length > 0 ? (
+            <div class="grid srch__grid">
+              {results.map((p, i) => (
+                <ProductCard product={p} priority={i < 2} />
+              ))}
+            </div>
+          ) : (
+            <div class="srch__none">
+              <p class="lede">Nothing matched “{q}”.</p>
+              <p>
+                Search works on product names and colours — try “star”, “charcoal” or{' '}
+                <a href="/collections/all">browse everything</a>.
+              </p>
+            </div>
+          )}
+        </>
+      )
+    }
+  </div>
+</Base>
+
+<style>
+  .srch {
+    padding-block: clamp(1.5rem, 4vw, 3rem) clamp(2rem, 6vw, 5rem);
+  }
+  .srch__form {
+    display: flex;
+    gap: 0.6rem;
+    margin-block: clamp(1.25rem, 3vw, 2rem);
+    max-width: 620px;
+  }
+  .srch__input {
+    flex: 1;
+  }
+  .srch__hints ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    padding: 0;
+    margin-block-start: 0.75rem;
+  }
+  .srch__hints a:hover {
+    color: var(--ink);
+    border-color: var(--ink-faint);
+  }
+  .srch__count {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-dim);
+    padding-block-end: 1rem;
+    margin-block-end: clamp(1rem, 3vw, 2rem);
+    border-block-end: 1px solid var(--rule-soft);
+  }
+  .srch__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .srch__none {
+    display: grid;
+    gap: 0.75rem;
+    padding-block: 2rem;
+    color: var(--ink-dim);
+  }
+  .srch__none a {
+    color: var(--rose);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  @media (max-width: 1100px) {
+    .srch__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 820px) {
+    .srch__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 420px) {
+    .srch__form {
+      flex-direction: column;
+    }
+  }
+</style>
