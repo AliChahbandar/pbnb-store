@@ -1,0 +1,23 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+.astro/
+.wrangler/
+.vercel/
+.netlify/
+
+# env — never commit credentials
+.env
+.env.*
+!.env.example
+
+# raw source artwork — originals never get committed
+assets-raw/
+
+# os
+.DS_Store
+*.log
+npm-debug.log*
