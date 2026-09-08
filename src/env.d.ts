@@ -3,11 +3,13 @@
 
 type Runtime = import('@astrojs/cloudflare').Runtime<Env>;
 
+// Worker bindings. The Admin token is deliberately absent: it is only ever read
+// by scripts/seed-shopify.mjs from .env on your machine, and must never be
+// deployed as a Worker binding or referenced from src/.
 interface Env {
   SHOPIFY_STORE_DOMAIN?: string;
   SHOPIFY_STOREFRONT_TOKEN?: string;
   SHOPIFY_STOREFRONT_PRIVATE_TOKEN?: string;
-  SHOPIFY_ADMIN_TOKEN?: string;
   SHOPIFY_API_VERSION?: string;
 }
 
