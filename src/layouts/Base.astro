@@ -41,6 +41,13 @@ const canonical =
 const ogImage = new URL(image, site).href;
 
 const fullTitle = title.includes('PB&B') ? title : `${title} — PB&B`;
+
+// Any host that isn't the production domain is a preview, and previews must not
+// be indexed — a crawled *.workers.dev copy competes with pbnb.store for its own
+// content and outlives the preview itself. Canonicals still point at the real
+// domain, so this is belt-and-braces.
+const isPreview = Astro.url.hostname !== site.hostname && Astro.url.hostname !== 'localhost';
+const robots = noindex || isPreview ? 'noindex,nofollow' : null;
 ---
 
 <!doctype html>
@@ -51,7 +58,7 @@ const fullTitle = title.includes('PB&B') ? title : `${title} — PB&B`;
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    {noindex && <meta name="robots" content="noindex,nofollow" />}
+    {robots && <meta name="robots" content={robots} />}
 
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/mark.svg" type="image/svg+xml" />
