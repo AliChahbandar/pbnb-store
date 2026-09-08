@@ -1,0 +1,73 @@
+---
+import Prose from '../layouts/Prose.astro';
+import { SIZE_CHARTS } from '../lib/fixtures';
+export const prerender = true;
+
+const charts = Object.values(SIZE_CHARTS);
+const cell = (row: any, col: string) => {
+  const k = col.toLowerCase();
+  if (k.startsWith('chest')) return row.chest;
+  if (k.startsWith('body') || k.startsWith('length')) return row.length;
+  if (k.startsWith('sleeve')) return row.sleeve;
+  if (k.startsWith('waist')) return row.waist;
+  if (k.startsWith('inseam')) return row.inseam;
+  if (k.startsWith('rise')) return row.rise;
+  return '';
+};
+---
+
+<Prose
+  title="Size guide"
+  description="Flat measurements in inches for every PB&B garment, plus how to measure."
+  heading="Size guide"
+  standfirst="Every garment is measured flat, in inches. Compare these to a piece you already own rather than to your body."
+>
+  <h2>How to measure</h2>
+  <p>
+    Lay a garment you already like flat and smooth out the wrinkles. Measure straight across — pit
+    to pit for chest, top of the shoulder seam straight down for body length, shoulder seam to cuff
+    for sleeve. Then match those numbers to the table. This is far more reliable than converting
+    from body measurements.
+  </p>
+
+  {charts.map((chart) => (
+    <>
+      <h2>{chart.title}</h2>
+      <div class="prose__scroll">
+        <table>
+          <caption class="visually-hidden">{chart.title}, measurements in inches</caption>
+          <thead>
+            <tr>{chart.columns.map((c) => <th scope="col">{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {chart.rows.map((row) => (
+              <tr>
+                <th scope="row">{row.size}{row.measured ? ' *' : ''}</th>
+                {chart.columns.slice(1).map((c) => <td>{cell(row, c)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p><small>{chart.note}</small></p>
+    </>
+  ))}
+
+  <h2>What the asterisk means</h2>
+  <p>
+    A row marked <strong>*</strong> is measured off an actual production sample. Unmarked rows are
+    graded from it using a consistent step and have not been checked against a physical garment yet.
+    We would rather tell you that than present a guess as a measurement.
+  </p>
+
+  <h2>Between sizes?</h2>
+  <p>
+    The tees and hoodies are already cut boxy, so if you are between sizes take the smaller one
+    unless you want it noticeably oversized. For denim, go by your true waist — the leg is baggy by
+    design regardless of the size you pick.
+  </p>
+  <p>
+    If it still lands wrong, the first exchange is free. See
+    <a href="/policies/refund">returns and exchanges</a>.
+  </p>
+</Prose>

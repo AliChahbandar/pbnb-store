@@ -14,3 +14,10 @@ interface Env {
 declare namespace App {
   interface Locals extends Runtime {}
 }
+
+// The Cloudflare runtime binding module. Astro v6+ removed
+// `Astro.locals.runtime.env`; this is the supported replacement, and the
+// adapter shims it in dev and at build time.
+declare module 'cloudflare:workers' {
+  export const env: Env;
+}

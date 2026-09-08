@@ -1,0 +1,78 @@
+---
+import Prose from '../layouts/Prose.astro';
+export const prerender = true;
+
+const faqs = [
+  {
+    q: 'How does PB&B fit?',
+    a: 'Tees and hoodies are cut boxy and relaxed — a wide chest and a short, square body. Take your usual size for the intended drape, or size down if you want it closer. The zip hoodies are cropped and sit above the hip. Denim is baggy through the hip and thigh with a full straight leg; take your true waist measurement, because the volume is in the leg and not the waistband.',
+  },
+  {
+    q: 'Do all the tees fit the same?',
+    a: 'Yes. Every tee is cut from the same block, so once you know your size in one you know it in all of them. Same for the zip hoodies.',
+  },
+  {
+    q: 'How do I know what size to order?',
+    a: 'Use the flat measurements in the size guide rather than guessing from a letter. Lay a garment you already like flat, measure pit to pit for chest and shoulder seam down for length, and match those numbers to the table. The size L tee is measured off the production sample; other sizes are graded from it.',
+  },
+  {
+    q: 'What is the fabric?',
+    a: '[FABRIC: FILL] — composition is confirmed off the garment labels before this goes live, so it is not stated here yet.',
+  },
+  {
+    q: 'A size is showing as sold out. Will it come back?',
+    a: 'Sold-out sizes are shown rather than hidden, so you can see we make your size and it has run out. Restocks depend on the run — email us and we will tell you whether that colourway is coming back.',
+  },
+  {
+    q: 'Why can I not pick a size in one of the colours?',
+    a: 'Some graphics are only produced in part of the size run. Those sizes appear faded rather than struck through: it means that colourway was never made in that size, not that it sold out.',
+  },
+  {
+    q: 'Can I exchange for a different size?',
+    a: 'Yes — the first exchange on an order is free. Fit is the main reason apparel gets returned, and we would rather you end up with the right size. See the returns policy for the window and how to start one.',
+  },
+  {
+    q: 'When will my order ship?',
+    a: 'Orders ship within [CONFIRM] 2 business days. Tracking is emailed when the label is created.',
+  },
+  {
+    q: 'Do you ship internationally?',
+    a: '[CONFIRM] Which countries you ship to, and who covers duties and import charges.',
+  },
+  {
+    q: 'How should I wash it?',
+    a: 'Cold, inside out, and hang or tumble dry low. Do not iron directly on a print. Wash the denim separately for the first few washes.',
+  },
+];
+
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  },
+];
+---
+
+<Prose
+  title="FAQ"
+  description="Fit, sizing, shipping, exchanges and care — the questions that come up most."
+  heading="FAQ"
+  standfirst="Fit and sizing first, since that's what most people are here for."
+>
+  {faqs.map((f) => (
+    <>
+      <h2>{f.q}</h2>
+      <p set:html={f.a.replace(/\[(FABRIC: FILL|CONFIRM|FILL)\]/g, '<mark class="todo">[$1]</mark>')} />
+    </>
+  ))}
+
+  <h2>Still stuck?</h2>
+  <p><a href="/contact">Send us a message</a> — fit questions get answered fastest.</p>
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd[0])} />
+</Prose>

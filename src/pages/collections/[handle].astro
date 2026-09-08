@@ -134,7 +134,7 @@ const jsonLd = [
                         <a
                           class={`chip${on ? ' chip--on' : ''}`}
                           href={toggle(kind, v.value)}
-                          aria-pressed={on ? 'true' : 'false'}
+                          aria-current={on ? 'true' : undefined}
                           rel="nofollow"
                         >
                           {facet.name === 'Color' && (

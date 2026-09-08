@@ -1,0 +1,63 @@
+---
+import Prose from '../../layouts/Prose.astro';
+export const prerender = true;
+---
+
+<Prose
+  title="Shipping"
+  description="Dispatch times, shipping rates and delivery for PB&B orders."
+  heading="Shipping"
+  standfirst="Rates and delivery estimates are calculated at checkout once your address is known."
+  updated="[CONFIRM] date"
+>
+  <h2>Dispatch</h2>
+  <p>
+    Orders are packed and dispatched within <mark class="todo">[CONFIRM] 2 business days</mark>.
+    You'll get a tracking number by email as soon as the label is created. Orders placed on a
+    weekend or a public holiday go out on the next business day.
+  </p>
+
+  <h2>Rates</h2>
+  <p>
+    Live rates are shown at checkout based on your address and the weight of the order — nothing is
+    marked up beyond the carrier's price.
+  </p>
+  <ul>
+    <li><strong>Free US shipping</strong> on orders over <mark class="todo">[CONFIRM] $150</mark>.</li>
+    <li><strong>US standard</strong> — <mark class="todo">[CONFIRM] rate and carrier</mark>.</li>
+    <li><strong>US expedited</strong> — <mark class="todo">[CONFIRM] rate and carrier</mark>.</li>
+    <li><strong>International</strong> — <mark class="todo">[CONFIRM] destinations and rates</mark>.</li>
+  </ul>
+  <p>
+    <mark class="todo">[CONFIRM]</mark> Which shipping zones are configured in Shopify. Rates will
+    not calculate at checkout for any zone that has not been set up, and the order will fail — this
+    is worth testing per destination before launch.
+  </p>
+
+  <h2>Delivery estimates</h2>
+  <p>
+    <mark class="todo">[CONFIRM] Transit times per service.</mark> These are carrier estimates and
+    not guarantees; once a parcel is scanned in, its progress is out of our hands.
+  </p>
+
+  <h2>Duties and import charges</h2>
+  <p>
+    <mark class="todo">[CONFIRM]</mark> Whether international prices include duties, or whether the
+    recipient pays them on delivery. Getting this wrong is the most common cause of refused
+    international parcels, so it should be stated plainly.
+  </p>
+
+  <h2>Wrong address</h2>
+  <p>
+    Check your address at checkout. If you spot a mistake, email
+    <a href="/contact">support</a> straight away — we can usually correct it before dispatch, but
+    once a parcel has shipped we can't reroute it.
+  </p>
+
+  <h2>Lost or damaged parcels</h2>
+  <p>
+    If tracking stalls for more than <mark class="todo">[CONFIRM] 10 business days</mark>, or your
+    order arrives damaged, contact us with your order number and we'll open a claim with the carrier
+    and sort you out. You do not have to deal with the carrier yourself.
+  </p>
+</Prose>

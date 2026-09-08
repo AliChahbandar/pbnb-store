@@ -1,0 +1,83 @@
+---
+import Prose from '../../layouts/Prose.astro';
+export const prerender = true;
+---
+
+<Prose
+  title="Privacy policy"
+  description="What data PB&B collects, why, and what control you have over it."
+  heading="Privacy policy"
+  standfirst="What we collect, why we collect it, and how to get it removed."
+  updated="[CONFIRM] date"
+>
+  <p>
+    This policy covers pbnb.store. The data controller is
+    <mark class="todo">[FILL] registered business name and contact address</mark>.
+  </p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li>
+      <strong>Order information</strong> — name, email, shipping and billing address, phone number
+      if you give one, and what you bought. We need this to fulfil the order.
+    </li>
+    <li>
+      <strong>Payment information</strong> — handled by Shopify's checkout. We receive confirmation
+      that payment succeeded and the last four digits of the card. We never see or store your full
+      card number.
+    </li>
+    <li>
+      <strong>Your bag</strong> — a cookie holding an identifier for your shopping bag so it
+      survives between page loads. It contains no personal information.
+    </li>
+    <li>
+      <strong>Marketing</strong> — your email address, if you sign up for drop announcements.
+    </li>
+    <li>
+      <strong>Technical data</strong> — your IP address is forwarded to Shopify with product and
+      cart requests. Shopify uses it for fraud and bot protection and to keep one shopper's traffic
+      from affecting another's. It is not used to profile you.
+    </li>
+  </ul>
+
+  <h2>What we don't do</h2>
+  <p>We don't sell your data, and we don't share it with advertisers.</p>
+
+  <h2>Who processes your data</h2>
+  <ul>
+    <li><strong>Shopify</strong> — store backend, checkout, payments and order records.</li>
+    <li><strong>Cloudflare</strong> — hosting and delivery of this site.</li>
+    <li><strong>Shipping carriers</strong> — the name and address needed to deliver your parcel.</li>
+    <li><mark class="todo">[CONFIRM]</mark> Any email marketing or analytics tool you add, e.g. Klaviyo.</li>
+  </ul>
+
+  <h2>Cookies</h2>
+  <p>
+    We set a cookie for your shopping bag, which is required for the store to work. Shopify sets its
+    own cookies during checkout for the same reason.
+    <mark class="todo">[CONFIRM]</mark> whether any analytics or marketing cookies are added — if so,
+    a consent banner is required in the UK/EU and this section needs to list them.
+  </p>
+
+  <h2>How long we keep it</h2>
+  <p>
+    Order records are kept for as long as tax and accounting law requires
+    (<mark class="todo">[CONFIRM] typically 6–7 years</mark>). Marketing emails are kept until you
+    unsubscribe.
+  </p>
+
+  <h2>Your rights</h2>
+  <p>
+    You can ask for a copy of your data, ask us to correct it, or ask us to delete it. Depending on
+    where you live you may also have the right to object to processing or to data portability
+    (GDPR), or to opt out of sale or sharing (CCPA — we do neither). Email
+    <a href="/contact">support</a> and we'll respond within 30 days.
+  </p>
+  <p>You can unsubscribe from marketing at any time with the link in any email.</p>
+
+  <h2>Children</h2>
+  <p>This store isn't directed at children under 13 and we don't knowingly collect their data.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes materially we'll update the date at the top of this page.</p>
+</Prose>

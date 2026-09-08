@@ -1,0 +1,123 @@
+---
+import Base from './Base.astro';
+
+export interface Props {
+  title: string;
+  description: string;
+  heading?: string;
+  standfirst?: string;
+  updated?: string;
+}
+const { title, description, heading, standfirst, updated } = Astro.props;
+---
+
+<Base title={title} description={description} motion={false}>
+  <article class="wrap prose">
+    <header class="prose__head">
+      <h1 class="h2">{heading ?? title}</h1>
+      {standfirst && <p class="lede">{standfirst}</p>}
+      {updated && <p class="prose__updated">Last updated {updated}</p>}
+    </header>
+    <div class="prose__body">
+      <slot />
+    </div>
+  </article>
+</Base>
+
+<style is:global>
+  .prose {
+    padding-block: clamp(2rem, 5vw, 4rem) clamp(2.5rem, 6vw, 5rem);
+    max-width: 76ch;
+  }
+  .prose__head {
+    padding-block-end: clamp(1.5rem, 4vw, 2.5rem);
+    margin-block-end: clamp(1.5rem, 4vw, 2.5rem);
+    border-block-end: 1px solid var(--rule);
+  }
+  .prose__head .lede {
+    margin-block-start: 1rem;
+  }
+  .prose__updated {
+    margin-block-start: 1rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+  }
+  .prose__body {
+    color: var(--ink-dim);
+  }
+  .prose__body > * + * {
+    margin-block-start: 1.1rem;
+  }
+  .prose__body h2 {
+    margin-block-start: 2.5rem;
+    font-size: var(--step-1);
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: -0.015em;
+  }
+  .prose__body h3 {
+    margin-block-start: 1.75rem;
+    font-size: var(--step-0);
+    color: var(--ink);
+    font-family: var(--body);
+    font-weight: 700;
+  }
+  .prose__body ul,
+  .prose__body ol {
+    padding-inline-start: 1.25rem;
+    display: grid;
+    gap: 0.55rem;
+  }
+  .prose__body a {
+    color: var(--rose);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .prose__body a:hover {
+    color: var(--ink);
+  }
+  .prose__body strong {
+    color: var(--ink);
+  }
+  /* Anything still needing the owner's input is visibly flagged rather than
+     quietly guessed at. */
+  .prose__body mark,
+  mark.todo {
+    background: color-mix(in srgb, var(--orange) 22%, transparent);
+    color: var(--wheat);
+    padding: 0.1em 0.4em;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 0.85em;
+  }
+  .prose__body blockquote {
+    margin-inline: 0;
+    padding: 1rem 1.25rem;
+    background: var(--bg-raised);
+    border-inline-start: 2px solid var(--berry);
+    border-radius: var(--radius);
+  }
+  .prose__body table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+  }
+  .prose__scroll {
+    overflow-x: auto;
+  }
+  .prose__body th,
+  .prose__body td {
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    border-block-end: 1px solid var(--rule-soft);
+    white-space: nowrap;
+  }
+  .prose__body thead th {
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.7rem;
+  }
+</style>

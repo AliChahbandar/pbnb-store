@@ -69,7 +69,7 @@ const fullTitle = title.includes('PB&B') ? title : `${title} — PB&B`;
 
     {
       jsonLd.map((block) => (
-        <script type="application/ld+json" set:html={JSON.stringify(block)} />
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(block)} />
       ))
     }
   </head>

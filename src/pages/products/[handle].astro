@@ -11,7 +11,6 @@ import {
   LOW_STOCK_THRESHOLD,
 } from '../../lib/catalog';
 import { money } from '../../lib/money';
-import { gidTail } from '../../lib/shopify';
 
 const { handle } = Astro.params;
 const { data: product, fixture } = await getProduct(handle!, {
@@ -29,6 +28,12 @@ const hasSizes = sizes.length > 0;
 const qp = Astro.url.searchParams;
 const selColor = colors.includes(qp.get('color') ?? '') ? qp.get('color')! : (colors[0] ?? '');
 const requestedSize = qp.get('size') ?? '';
+// Errors from the no-JS form POST come back on the query string. Strip it from
+// the redirect target so it can't accumulate across repeated submissions.
+const cartError = qp.get('cart_error');
+const cleanParams = new URLSearchParams(qp);
+cleanParams.delete('cart_error');
+const selfUrl = Astro.url.pathname + (cleanParams.toString() ? `?${cleanParams}` : '');
 
 /** Availability of every size within the selected colourway. */
 type SizeState = { size: string; state: 'ok' | 'low' | 'out' | 'unavailable'; qty: number | null; variantId: string | null };
@@ -183,7 +188,7 @@ const jsonLd = [
           <form class="buy__form" method="POST" action="/api/cart">
             <input type="hidden" name="action" value="add" />
             <input type="hidden" name="variantId" value={variant?.id ?? ''} data-variant-input />
-            <input type="hidden" name="redirect" value={Astro.url.pathname + Astro.url.search} />
+            <input type="hidden" name="redirect" value={selfUrl} />
 
             {/* COLOUR */}
             {
@@ -207,7 +212,7 @@ const jsonLd = [
                             class={`swatch${on ? ' swatch--on' : ''}`}
                             href={`?${params.toString()}`}
                             style={`--chip:${colorSwatch(c)}`}
-                            aria-pressed={on ? 'true' : 'false'}
+                            aria-current={on ? 'true' : undefined}
                             data-color={c}
                             title={c}
                           >
@@ -251,7 +256,7 @@ const jsonLd = [
                           <a
                             class={`size size--${s.state}${on ? ' size--on' : ''}`}
                             href={`?${params.toString()}`}
-                            aria-pressed={on ? 'true' : 'false'}
+                            aria-current={on ? 'true' : undefined}
                             aria-disabled={dead ? 'true' : undefined}
                             data-size={s.size}
                             data-state={s.state}
@@ -286,6 +291,12 @@ const jsonLd = [
                 </fieldset>
               )
             }
+
+            {cartError && (
+              <p class="buy__error" role="alert">
+                {cartError}
+              </p>
+            )}
 
             <button class="btn btn--accent btn--block buy__add" type="submit" disabled={!canBuy} data-add>
               {canBuy ? 'Add to bag' : chosen?.state === 'out' ? 'Sold out' : 'Unavailable'}
@@ -352,7 +363,7 @@ const jsonLd = [
 
   {sizeChart && <SizeGuideDialog chart={sizeChart} />}
 
-  <script type="application/json" data-pdp set:html={JSON.stringify(payload)} />
+  <script is:inline type="application/json" data-pdp set:html={JSON.stringify(payload)} />
   <script>
     // Progressive enhancement. Without JS every selector is a plain link and a
     // full page load renders the correct state, so nothing here is required —
@@ -395,7 +406,8 @@ const jsonLd = [
           const st = stateOf(v);
           a.className = `size size--${st}${s === size ? ' size--on' : ''}`;
           a.dataset.state = st;
-          a.setAttribute('aria-pressed', s === size ? 'true' : 'false');
+          if (s === size) a.setAttribute('aria-current', 'true');
+          else a.removeAttribute('aria-current');
           if (st === 'out' || st === 'unavailable') a.setAttribute('aria-disabled', 'true');
           else a.removeAttribute('aria-disabled');
           const p = new URLSearchParams();
@@ -409,7 +421,8 @@ const jsonLd = [
         document.querySelectorAll<HTMLAnchorElement>('.swatch').forEach((a) => {
           const on = a.dataset.color === color;
           a.classList.toggle('swatch--on', on);
-          a.setAttribute('aria-pressed', on ? 'true' : 'false');
+          if (on) a.setAttribute('aria-current', 'true');
+          else a.removeAttribute('aria-current');
           const p = new URLSearchParams();
           p.set('color', a.dataset.color!);
           if (data.hasSizes && size) p.set('size', size);
@@ -636,6 +649,14 @@ const jsonLd = [
     color: var(--orange);
   }
 
+  .buy__error {
+    padding: 0.75rem 0.9rem;
+    background: color-mix(in srgb, var(--berry) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--berry) 42%, transparent);
+    border-radius: var(--radius);
+    color: var(--rose);
+    font-size: var(--step--1);
+  }
   .buy__add {
     margin-block-start: 0.25rem;
   }
