@@ -55,6 +55,48 @@ scripts/        seed-shopify.mjs
 assets-raw/     original artwork (gitignored, never committed)
 ```
 
+## Deploy
+
+The repo is on GitHub at `AliChahbandar/pbnb-store` (private). Pushing to `main`
+runs `.github/workflows/deploy.yml`: type check → build → deploy.
+
+**Target is Cloudflare Workers, not Pages.** `@astrojs/cloudflare` v14 builds a Worker
+with a static-assets binding and writes its own `dist/server/wrangler.json`, so the
+deploy command is `wrangler deploy`, not `wrangler pages deploy`. Cloudflare Pages is
+in maintenance mode for new projects; Workers Static Assets is its successor.
+
+Two repo secrets are required before the deploy job can run:
+
+| Secret | Where to get it |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard → My Profile → API Tokens → Create Token → *Edit Cloudflare Workers* template |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → right-hand sidebar |
+
+```bash
+gh secret set CLOUDFLARE_API_TOKEN
+gh secret set CLOUDFLARE_ACCOUNT_ID
+```
+
+Shopify credentials are **Worker secrets**, not repo secrets — they belong to the
+running Worker, not the build:
+
+```bash
+npx wrangler secret put SHOPIFY_STORE_DOMAIN            --config dist/server/wrangler.json
+npx wrangler secret put SHOPIFY_STOREFRONT_TOKEN        --config dist/server/wrangler.json
+npx wrangler secret put SHOPIFY_STOREFRONT_PRIVATE_TOKEN --config dist/server/wrangler.json
+```
+
+`SHOPIFY_ADMIN_TOKEN` is **never** set as a Worker secret. It is read only by
+`scripts/seed-shopify.mjs` from your local `.env`.
+
+To deploy by hand instead:
+
+```bash
+npx wrangler login
+npm run build
+npx wrangler deploy --config dist/server/wrangler.json
+```
+
 ## Docs
 
 - [`DECISIONS.md`](./DECISIONS.md) — every non-obvious call, placeholder prices,
