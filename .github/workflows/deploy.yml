@@ -32,10 +32,32 @@ jobs:
           path: dist
           retention-days: 5
 
-  deploy:
+  # The `secrets` context can't be read in a job-level `if`, so a tiny job
+  # converts "is the Cloudflare token set" into an output that can be.
+  # Without this, every push before Cloudflare is configured fails CI, which
+  # just teaches you to ignore the red X.
+  can-deploy:
     needs: build
-    # Only deploy from main, and only when Cloudflare credentials exist.
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare secrets not set — skipping deploy. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to enable it."
+          fi
+
+  deploy:
+    needs: can-deploy
+    if: needs.can-deploy.outputs.ready == 'true'
     runs-on: ubuntu-latest
     environment: production
     steps:
