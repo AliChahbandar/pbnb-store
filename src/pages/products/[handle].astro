@@ -12,6 +12,13 @@ import {
 } from '../../lib/catalog';
 import { money } from '../../lib/money';
 
+// Used only by the static preview build (output: 'static'); the Cloudflare
+// SSR build renders on demand and ignores this.
+export async function getStaticPaths() {
+  const { FIXTURE_PRODUCTS } = await import('../../lib/fixtures');
+  return FIXTURE_PRODUCTS.map((p) => ({ params: { handle: p.handle } }));
+}
+
 const { handle } = Astro.params;
 const { data: product, fixture } = await getProduct(handle!, {
   request: Astro.request,

@@ -21,3 +21,7 @@ assets-raw/
 .DS_Store
 *.log
 npm-debug.log*
+
+# static preview build output
+dist-pages/
+.api-stash/

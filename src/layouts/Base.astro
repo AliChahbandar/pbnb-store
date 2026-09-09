@@ -27,11 +27,21 @@ const {
   jsonLd = [],
 } = Astro.props;
 
-const site = Astro.site ?? new URL('https://pbnb.store');
-// With `build.format: 'file'` a prerendered route's pathname is `/about.html`.
-// The canonical (and the sitemap) must be the extensionless URL that is
-// actually served, so strip the extension and any trailing slash.
-const cleanPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/index$/, '') || '/';
+// Canonicals always point at the production domain, whatever host is serving
+// this build — a preview must never present itself as the canonical copy.
+const PROD_ORIGIN = 'https://pbnb.store';
+const site = new URL(PROD_ORIGIN);
+// With `build.format: 'file'` a prerendered route's pathname is `/about.html`,
+// and the Pages build additionally serves under a `/pbnb-store` base. The
+// canonical (and the sitemap) must be the clean production URL, so strip both.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const cleanPath =
+  (base && Astro.url.pathname.startsWith(base)
+    ? Astro.url.pathname.slice(base.length)
+    : Astro.url.pathname
+  )
+    .replace(/\.html$/, '')
+    .replace(/\/index$/, '') || '/';
 // Root keeps its slash (matching the sitemap); every other path drops it.
 const canonical =
   cleanPath === '/'
@@ -42,11 +52,13 @@ const ogImage = new URL(image, site).href;
 
 const fullTitle = title.includes('PB&B') ? title : `${title} — PB&B`;
 
-// Any host that isn't the production domain is a preview, and previews must not
-// be indexed — a crawled *.workers.dev copy competes with pbnb.store for its own
-// content and outlives the preview itself. Canonicals still point at the real
-// domain, so this is belt-and-braces.
-const isPreview = Astro.url.hostname !== site.hostname && Astro.url.hostname !== 'localhost';
+// Anything not actually served from pbnb.store is a preview, and previews must
+// not be indexed — a crawled github.io or workers.dev copy would compete with
+// the real store for its own content and outlive the preview itself. A
+// non-empty base path also means this is the Pages build, which is always a
+// preview regardless of host.
+const isPreview =
+  Boolean(base) || (Astro.url.hostname !== site.hostname && Astro.url.hostname !== 'localhost');
 const robots = noindex || isPreview ? 'noindex,nofollow' : null;
 ---
 

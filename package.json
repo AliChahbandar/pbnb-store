@@ -9,7 +9,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "deploy": "npm run build && wrangler deploy --config dist/server/wrangler.json",
-    "deploy:preview": "npm run build && wrangler deploy --config dist/server/wrangler.json --temporary"
+    "deploy:preview": "npm run build && wrangler deploy --config dist/server/wrangler.json --temporary",
+    "build:pages": "node scripts/build-pages.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.3.0",

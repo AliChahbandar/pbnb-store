@@ -1,0 +1,53 @@
+name: Preview (GitHub Pages)
+
+# A permanent, free preview URL that does not expire.
+#
+# This is NOT the production deploy — that is Cloudflare Workers (deploy.yml),
+# which server-renders. This builds the same site statically so it can live on
+# GitHub Pages forever without an account that gets reclaimed.
+#
+# It is an honest preview of the current state: with no Shopify credentials
+# every page already renders from build-time fixtures, so nothing is genuinely
+# dynamic yet. The cart is inert here by construction.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two Pages deploys race; always let the newest win.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/configure-pages@v5
+      - name: Build static preview
+        run: npm run build:pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

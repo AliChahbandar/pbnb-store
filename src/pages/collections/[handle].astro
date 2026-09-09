@@ -3,6 +3,12 @@ import Base from '../../layouts/Base.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import { getCollection, colorSwatch } from '../../lib/catalog';
 
+// Used only by the static preview build; the SSR build renders on demand.
+export async function getStaticPaths() {
+  const { FIXTURE_COLLECTIONS } = await import('../../lib/fixtures');
+  return FIXTURE_COLLECTIONS.map((c) => ({ params: { handle: c.handle } }));
+}
+
 const { handle } = Astro.params;
 const url = Astro.url;
 const params = url.searchParams;
