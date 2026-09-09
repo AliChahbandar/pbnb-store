@@ -67,6 +67,26 @@ function basePathRewriter() {
         await walk(root);
         logger.info(`base-path rewrite: ${edits}/${files} HTML files updated to ${BASE}/`);
 
+        // The web manifest is JSON, not HTML, so the walk above never sees it —
+        // and its root-relative start_url/icon paths 404 under a base path,
+        // which surfaces as a console error and dings Best Practices.
+        const manifestPath = path.join(root, 'site.webmanifest');
+        try {
+          const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+          if (typeof manifest.start_url === 'string' && manifest.start_url.startsWith('/')) {
+            manifest.start_url = `${BASE}${manifest.start_url}`;
+          }
+          for (const icon of manifest.icons ?? []) {
+            if (typeof icon.src === 'string' && icon.src.startsWith('/') && !icon.src.startsWith(BASE)) {
+              icon.src = `${BASE}${icon.src}`;
+            }
+          }
+          await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+          logger.info('rewrote site.webmanifest paths for the base path');
+        } catch {
+          logger.warn('site.webmanifest not found or unparseable — skipped');
+        }
+
         // GitHub Pages runs Jekyll by default, which silently drops any path
         // beginning with an underscore — that would delete the entire _astro/
         // directory and take every stylesheet with it. This opts out.
