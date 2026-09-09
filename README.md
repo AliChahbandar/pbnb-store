@@ -89,13 +89,28 @@ npx wrangler secret put SHOPIFY_STOREFRONT_PRIVATE_TOKEN --config dist/server/wr
 `SHOPIFY_ADMIN_TOKEN` is **never** set as a Worker secret. It is read only by
 `scripts/seed-shopify.mjs` from your local `.env`.
 
-To deploy by hand instead:
+### Deploying by hand
 
 ```bash
-npx wrangler login
-npm run build
-npx wrangler deploy --config dist/server/wrangler.json
+npx wrangler login   # once, interactive
+npm run deploy       # permanent, on your own account
 ```
+
+### Throwaway preview URL (no login)
+
+```bash
+npm run deploy:preview
+```
+
+This uses `wrangler deploy --temporary`, which borrows a **temporary Cloudflare
+account**. It gives a public `*.workers.dev` URL in about 30 seconds with no
+credentials — but the account is reclaimed after a short window (in practice,
+under a day), after which the hostname stops resolving. Cloudflare then answers
+with the `100::` IPv6 discard address, so the browser hangs rather than showing
+an error: the symptom is **"loading forever"**, not a 404.
+
+Re-run the command to get a fresh URL. For anything you intend to share more
+than once, use `npm run deploy` on your own account instead.
 
 ## Docs
 
