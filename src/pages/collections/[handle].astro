@@ -50,6 +50,10 @@ if (!data.collection) return Astro.rewrite('/404');
 const col = data.collection;
 const products = col.products;
 
+// build.format:'file' makes the prerendered pathname `/collections/all.html`.
+// Strip that so facet links stay clean on every build.
+const routePath = url.pathname.replace(/\.html$/, '');
+
 /** Build a URL with one facet value toggled on/off. */
 function toggle(kind: string, value: string): string {
   const p = new URLSearchParams(url.search);
@@ -59,7 +63,7 @@ function toggle(kind: string, value: string): string {
   if (!cur.includes(value)) p.append(kind, value);
   p.delete('after');
   const q = p.toString();
-  return `${url.pathname}${q ? `?${q}` : ''}`;
+  return `${routePath}${q ? `?${q}` : ''}`;
 }
 function sortUrl(value: string): string {
   const p = new URLSearchParams(url.search);
@@ -67,14 +71,14 @@ function sortUrl(value: string): string {
   else p.delete('sort');
   p.delete('after');
   const q = p.toString();
-  return `${url.pathname}${q ? `?${q}` : ''}`;
+  return `${routePath}${q ? `?${q}` : ''}`;
 }
 function pageUrl(cursor: string): string {
   const p = new URLSearchParams(url.search);
   p.set('after', cursor);
-  return `${url.pathname}?${p.toString()}`;
+  return `${routePath}?${p.toString()}`;
 }
-const clearUrl = url.pathname;
+const clearUrl = routePath;
 const activeCount = sel.size.length + sel.color.length + sel.type.length;
 
 const facetKind: Record<string, 'size' | 'color' | 'type'> = {
@@ -122,7 +126,7 @@ const jsonLd = [
       <aside class="filters" aria-label="Filter products">
         <div class="filters__top">
           <h2 class="eyebrow">Filter</h2>
-          {activeCount > 0 && <a class="filters__clear" href={clearUrl}>Clear ({activeCount})</a>}
+          <a class="filters__clear" href={clearUrl} data-clear hidden={activeCount === 0}>Clear ({activeCount})</a>
         </div>
 
         {
@@ -140,6 +144,9 @@ const jsonLd = [
                         <a
                           class={`chip${on ? ' chip--on' : ''}`}
                           href={toggle(kind, v.value)}
+                          data-chip
+                          data-kind={kind}
+                          data-value={v.value}
                           aria-current={on ? 'true' : undefined}
                           rel="nofollow"
                         >
@@ -162,7 +169,7 @@ const jsonLd = [
       <!-- RESULTS -->
       <div class="results">
         <div class="results__bar">
-          <p class="results__count">
+          <p class="results__count" data-count>
             {products.length}
             {products.length === 1 ? ' product' : ' products'}
           </p>
@@ -182,19 +189,18 @@ const jsonLd = [
           </nav>
         </div>
 
-        {
-          products.length === 0 ? (
-            <p class="empty">
-              Nothing matches that combination. <a href={clearUrl}>Clear the filters</a> and try again.
-            </p>
-          ) : (
-            <div class="grid grid--col">
-              {products.map((p, i) => (
-                <ProductCard product={p} priority={i === 0} />
-              ))}
-            </div>
-          )
-        }
+        {/* Both states are always rendered so the client-side filter can
+            switch between them without a round trip; the server sets the
+            initial visibility. */}
+        <p class="empty" data-empty hidden={products.length > 0}>
+          Nothing matches that combination. <a href={clearUrl} data-clear-inline>Clear the filters</a> and
+          try again.
+        </p>
+        <div class="grid grid--col" data-grid hidden={products.length === 0}>
+          {products.map((p, i) => (
+            <ProductCard product={p} priority={i === 0} />
+          ))}
+        </div>
 
         {
           data.pageInfo.hasNextPage && data.pageInfo.endCursor && (
@@ -214,6 +220,83 @@ const jsonLd = [
       </div>
     </div>
   </div>
+
+<script>
+  // Progressive enhancement for filtering.
+  //
+  // Every chip is a real link and the server filters correctly on its own, so
+  // this is never required. It does two things: makes filtering instant on the
+  // SSR build (no round trip), and makes it work at all on the static GitHub
+  // Pages preview, where query params cannot reach a server.
+  const grid = document.querySelector<HTMLElement>('[data-grid]');
+  if (grid) {
+    const cards = [...grid.querySelectorAll<HTMLElement>('[data-card]')];
+    const countEl = document.querySelector<HTMLElement>('[data-count]');
+    const clearEl = document.querySelector<HTMLAnchorElement>('[data-clear]');
+    const emptyEl = document.querySelector<HTMLElement>('[data-empty]');
+
+    const KINDS = ['size', 'color', 'type'] as const;
+    const attrFor = { size: 'sizes', color: 'colors', type: 'type' } as const;
+
+    function selection(): Record<string, string[]> {
+      const p = new URLSearchParams(location.search);
+      return Object.fromEntries(KINDS.map((k) => [k, p.getAll(k)]));
+    }
+
+    function apply() {
+      const sel = selection();
+      let shown = 0;
+      for (const card of cards) {
+        const ok = KINDS.every((kind) => {
+          const want = sel[kind];
+          if (!want.length) return true;
+          const have = (card.dataset[attrFor[kind]] ?? '').split('|').filter(Boolean);
+          // Multiple values within one facet are OR; across facets they are AND.
+          return want.some((v) => have.includes(v));
+        });
+        card.closest<HTMLElement>('[data-card]')!.hidden = !ok;
+        if (ok) shown++;
+      }
+      if (countEl) countEl.textContent = `${shown} ${shown === 1 ? 'product' : 'products'}`;
+      if (emptyEl) emptyEl.hidden = shown > 0;
+      if (grid) grid.hidden = shown === 0;
+
+      const active = KINDS.reduce((n, k) => n + sel[k].length, 0);
+      if (clearEl) {
+        clearEl.hidden = active === 0;
+        clearEl.textContent = `Clear (${active})`;
+      }
+      for (const chip of document.querySelectorAll<HTMLAnchorElement>('[data-chip]')) {
+        const on = sel[chip.dataset.kind!]?.includes(chip.dataset.value!) ?? false;
+        chip.classList.toggle('chip--on', on);
+        if (on) chip.setAttribute('aria-current', 'true');
+        else chip.removeAttribute('aria-current');
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const chip = (e.target as HTMLElement).closest<HTMLAnchorElement>('[data-chip]');
+      const clear = (e.target as HTMLElement).closest<HTMLAnchorElement>('[data-clear], [data-clear-inline]');
+      if (!chip && !clear) return;
+      e.preventDefault();
+      const url = new URL(location.href);
+      if (clear) {
+        for (const k of KINDS) url.searchParams.delete(k);
+      } else if (chip) {
+        const { kind, value } = chip.dataset as { kind: string; value: string };
+        const cur = url.searchParams.getAll(kind);
+        url.searchParams.delete(kind);
+        for (const v of cur) if (v !== value) url.searchParams.append(kind, v);
+        if (!cur.includes(value)) url.searchParams.append(kind, value);
+      }
+      history.pushState({}, '', url);
+      apply();
+    });
+
+    addEventListener('popstate', apply);
+    apply();
+  }
+</script>
 </Base>
 
 <style>

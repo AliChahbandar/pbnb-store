@@ -55,6 +55,23 @@ scripts/        seed-shopify.mjs
 assets-raw/     original artwork (gitignored, never committed)
 ```
 
+## Live preview
+
+**https://alichahbandar.github.io/pbnb-store/** — permanent, rebuilt on every push
+to `main` by `.github/workflows/pages.yml`.
+
+This is a **static** build (`npm run build:pages` → `dist-pages/`), which is an
+honest representation of the current state: with no Shopify credentials every page
+already renders from build-time fixtures. Two differences from production worth
+knowing:
+
+- Deep-linked variants (`?color=Grey&size=XS`) resolve in the browser rather than
+  server-side. Filtering likewise runs client-side. Both work; they just aren't
+  server-rendered.
+- The cart is inert. `/api/cart` needs a runtime and is excluded from this build.
+
+Production is Cloudflare Workers, server-rendered — see below.
+
 ## Deploy
 
 The repo is on GitHub at `AliChahbandar/pbnb-store` (private). Pushing to `main`
@@ -89,7 +106,24 @@ npx wrangler secret put SHOPIFY_STOREFRONT_PRIVATE_TOKEN --config dist/server/wr
 `SHOPIFY_ADMIN_TOKEN` is **never** set as a Worker secret. It is read only by
 `scripts/seed-shopify.mjs` from your local `.env`.
 
-### Deploying by hand
+### Live preview
+
+**https://alichahbandar.github.io/pbnb-store/** — permanent, rebuilt on every push
+to `main` by `.github/workflows/pages.yml`.
+
+This is a **static** build (`npm run build:pages` → `dist-pages/`), which is an
+honest representation of the current state: with no Shopify credentials every page
+already renders from build-time fixtures. Two differences from production worth
+knowing:
+
+- Deep-linked variants (`?color=Grey&size=XS`) resolve in the browser rather than
+  server-side. Filtering likewise runs client-side. Both work; they just aren't
+  server-rendered.
+- The cart is inert. `/api/cart` needs a runtime and is excluded from this build.
+
+Production is Cloudflare Workers, server-rendered — see below.
+
+## Deploying by hand
 
 ```bash
 npx wrangler login   # once, interactive

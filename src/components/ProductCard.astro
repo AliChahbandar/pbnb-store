@@ -20,9 +20,26 @@ const perColor = (colors.length ? colors : [null]).map((c) => ({
 
 const soldOut = !product.availableForSale;
 const isNew = product.tags.includes('new');
+
+// Facet values for the client-side filter on collection/search pages. The
+// server already filters in SSR mode; these let the static preview do the same
+// work in the browser, and make SSR filtering feel instant.
+const sizeValues = [
+  ...new Set(
+    product.variants.flatMap((v) =>
+      v.selectedOptions.filter((o) => o.name === 'Size').map((o) => o.value),
+    ),
+  ),
+];
 ---
 
-<article class="card">
+<article
+  class="card"
+  data-card
+  data-type={product.productType}
+  data-colors={colors.join('|')}
+  data-sizes={sizeValues.join('|')}
+>
   <a class="card__link" href={`/products/${product.handle}`}>
     <div class="media card__media">
       {
